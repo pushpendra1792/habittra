@@ -1,9 +1,14 @@
 # AGENTS.md
 
-Rules for any agent or contributor working in this repository. These are not
+Rules for any agent or contributor working in Habittra. These are not
 suggestions. They apply to every change.
 
 Read this file before you touch anything.
+
+The app is spelled `Habittra` — one `b`, two `t`, capital `H`, lowercase after.
+Match that exactly in `package.json`, the web manifest, `index.html`, the README
+and anywhere else the name appears. Do not introduce `Habitra`, `Habbitra`,
+`Habittra.app` in prose, or any other variant.
 
 ## Secrets
 
