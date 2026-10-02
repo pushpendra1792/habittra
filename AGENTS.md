@@ -6,9 +6,12 @@ suggestions. They apply to every change.
 Read this file before you touch anything.
 
 The app is spelled `Habittra` — one `b`, two `t`, capital `H`, lowercase after.
-Match that exactly in `package.json`, the web manifest, `index.html`, the README
-and anywhere else the name appears. Do not introduce `Habitra`, `Habbitra`,
-`Habittra.app` in prose, or any other variant.
+Match that exactly wherever the user sees it: the web manifest, `index.html`
+title, the README, the UI and this file. Do not introduce `Habitra`, `Habbitra`
+or any other variant.
+
+The one exception is `package.json`, which stays lowercase `habittra`. That is
+npm's requirement for package names, not a typo. The lockfile mirrors it.
 
 ## Secrets
 
