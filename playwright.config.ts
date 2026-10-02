@@ -30,7 +30,9 @@ export default defineConfig({
   webServer: {
     // `vite preview` serves dist/, so build first. Keeps `npm run test:e2e`
     // self-contained instead of depending on a previous manual build.
-    command: `npm run build && npm run preview -- --port ${PORT} --strictPort`,
+    // --host is pinned because `vite preview` otherwise binds only to the IPv6
+    // `localhost`, which Playwright's IPv4 health check cannot reach.
+    command: `npm run build && npm run preview -- --host 127.0.0.1 --port ${PORT} --strictPort`,
     url: baseURL,
     reuseExistingServer: !process.env['CI'],
     timeout: 180_000,
