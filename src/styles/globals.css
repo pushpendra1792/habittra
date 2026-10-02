@@ -1,11 +1,64 @@
 @import 'tailwindcss';
 
+@import '@fontsource/inter/latin-400.css';
+@import '@fontsource/inter/latin-500.css';
+@import '@fontsource/inter/latin-600.css';
+@import '@fontsource/inter/latin-700.css';
+
+/* Tailwind v4 has no tailwind.config.js. @theme is the config, and it emits the
+   matching custom properties into :root, so these are both the Tailwind tokens
+   and the CSS variables.
+
+   Contrast was measured against each surface. Every text pairing below clears
+   WCAG AA (4.5:1) and every graphical pairing clears 3:1:
+     on bg-base #2f2f2f -> white 13.4:1, muted #b5b5b5 6.5:1,
+                          teal 8.0:1, blue 5.2:1, yellow 7.7:1, coral 4.8:1
+     on bg-surface #3f3f3f -> white 10.5:1, muted #b5b5b5 5.1:1
+     on card-light #f2f2f2 -> #1a1a1a 15.5:1
+   accent-purple is 2.8:1 on bg-base, so it must NOT be used for text on dark.
+   It is a fill colour only; the mark on top of it is white at 4.9:1. */
 @theme {
-  --color-surface: #2f2f2f;
-  --color-surface-raised: #3a3a3a;
-  --color-on-surface: #f5f5f5;
-  --color-on-surface-muted: #a8a8a8;
-  --color-accent: #7dd3a0;
+  /* Surfaces */
+  --color-bg-base: #2f2f2f;
+  --color-bg-surface: #3f3f3f;
+  --color-card-light: #f2f2f2;
+
+  /* Text */
+  --color-text-on-dark: #ffffff;
+  --color-text-muted-on-dark: #b5b5b5;
+  --color-text-on-light: #1a1a1a;
+
+  /* Accents */
+  --color-accent-teal: #3de0b0;
+  --color-accent-blue: #1fb0d0;
+  --color-accent-purple: #6c63d0;
+  --color-accent-yellow: #ffb800;
+  --color-accent-coral: #ff6b6b;
+
+  /* Mark/label colour that sits *on* each accent fill. Chosen per accent so the
+     mark clears AA rather than assuming white works everywhere. White on teal is
+     only 1.7:1, which is why the dark mark is the default. */
+  --color-on-accent-teal: #1a1a1a;
+  --color-on-accent-blue: #1a1a1a;
+  --color-on-accent-purple: #ffffff;
+  --color-on-accent-yellow: #1a1a1a;
+  --color-on-accent-coral: #1a1a1a;
+
+  /* Hairline that reads on both surfaces. */
+  --color-border-dark: #4d4d4d;
+  --color-border-light: #dcdcdc;
+
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-card: 14px;
+  --radius-pill: 999px;
+
+  /* Typography */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* Motion. Tailwind's duration-* classes resolve to these. */
+  --default-transition-duration: 180ms;
+  --default-transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @layer base {
@@ -21,21 +74,37 @@
 
   body {
     margin: 0;
-    background-color: var(--color-surface);
-    color: var(--color-on-surface);
-    -webkit-font-smoothing: antialiased;
+    background-color: var(--color-bg-base);
+    color: var(--color-text-on-dark);
+    font-family: var(--font-sans);
+    font-synthesis-weight: none;
     text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
   }
 
+  /* Focus is visible for keyboard users only. 2px teal with offset, applied
+     globally so a component cannot forget it. */
   :focus-visible {
-    outline: 2px solid var(--color-accent);
+    outline: 2px solid var(--color-accent-teal);
     outline-offset: 2px;
+  }
+
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  /* Digits must not shift width as values change. */
+  input,
+  button,
+  .tabular {
+    font-variant-numeric: tabular-nums;
   }
 }
 
 @layer utilities {
-  /* Honor the OS-level motion preference. Every animation and transition in the
-     app must be disabled when the user asks for reduced motion. */
+  /* Honour the OS motion preference. Every CSS animation and transition in the
+     app is disabled when the user asks for reduced motion. Components animated
+     in JS check useReducedMotion() separately, since this cannot reach them. */
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
