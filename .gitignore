@@ -1,3 +1,43 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Build output
+dist
+dist-ssr
+dev-dist
+build
+*.local
+
+# Test output
+coverage
+test-results
+playwright-report
+blob-report
+.playwright
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+service-role*.json
+
+# Android / Capacitor
+android
+ios
+*.apk
+*.aab
+
+# Vercel
+.vercel
+
 # Logs
 logs
 *.log
@@ -7,16 +47,18 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Caches
+.cache
+.vite
+.eslintcache
+*.tsbuildinfo
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj

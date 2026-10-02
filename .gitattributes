@@ -1,0 +1,21 @@
+# Normalise line endings so builds are reproducible across Windows and Linux.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
+*.apk binary
+*.aab binary
+*.jks binary
+*.keystore binary
+*.p12 binary
+*.pfx binary
+*.pdf binary

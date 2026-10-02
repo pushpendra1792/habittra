@@ -1,32 +1,134 @@
-# React + TypeScript + Vite
+# Habittra
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A habit tracker that runs as a website and as an Android app from one codebase,
+synced through a backend.
 
-Currently, two official plugins are available:
+Status: scaffolding only. No features are built yet.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Stack
 
-## React Compiler
+| Concern       | Choice                                    |
+| ------------- | ----------------------------------------- |
+| UI            | React 18 + TypeScript (strict), Vite      |
+| Styling       | Tailwind CSS 4                            |
+| Routing       | React Router 7                            |
+| Server state  | TanStack Query 5                          |
+| Backend       | Supabase (auth, Postgres, realtime)       |
+| Charts        | Recharts 3                                |
+| Animation     | Framer Motion 13                          |
+| Unit tests    | Vitest 5 + Testing Library                |
+| E2E tests     | Playwright                                |
+| Android shell | Capacitor 8                               |
+| Hosting       | Vercel (web), GitHub Actions (CI and APK) |
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Requirements
 
-## Expanding the Oxlint configuration
+- Node.js 20.19+ or 22.12+ (developed against Node 22)
+- npm 10+
+- Android Studio with the Android SDK, only if you are building the APK
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+## Getting started
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+cp .env.example .env.local   # then fill in the Supabase values
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+The dev server runs at http://localhost:5173.
+
+## Scripts
+
+| Script                     | What it does                               |
+| -------------------------- | ------------------------------------------ |
+| `npm run dev`              | Dev server with hot reload                 |
+| `npm run build`            | Typecheck, then build to `dist/`           |
+| `npm run preview`          | Serve the production build locally         |
+| `npm run lint`             | ESLint, type-aware, fails on any warning   |
+| `npm run lint:fix`         | ESLint with autofix                        |
+| `npm run format`           | Prettier write                             |
+| `npm run format:check`     | Prettier check (used in CI)                |
+| `npm run typecheck`        | `tsc` across app, config and e2e projects  |
+| `npm test`                 | Vitest unit tests, single run              |
+| `npm run test:watch`       | Vitest in watch mode                       |
+| `npm run test:e2e`         | Playwright e2e at 360px, 768px and 1280px  |
+| `npm run test:e2e:install` | Download the Playwright browsers (one-off) |
+
+`npm run test:e2e` builds the app itself and then serves `dist/`, so it works from
+a clean checkout. The first run needs browsers: `npm run test:e2e:install`.
+
+## Project layout
+
+```
+src/
+  components/
+    layout/        App shell, navigation, page chrome
+    ui/            Presentational primitives (Button, Dialog, ...)
+  features/
+    auth/          Sign in, sign up, session
+    habits/        Habit definitions and CRUD
+    tracker/       Daily check-ins
+    dashboard/     Charts and summaries
+    settings/      User settings
+  hooks/           Shared React hooks
+  lib/             Framework-agnostic helpers and clients
+  pages/           One component per route
+  styles/          Global CSS and Tailwind theme tokens
+  test/            Test setup and shared test utilities
+  types/           Shared TypeScript types
+```
+
+Imports are aliased. `@/lib/dates` resolves to `src/lib/dates`.
+
+```
+@/...  ->  ./src/...
+```
+
+## PWA
+
+`vite-plugin-pwa` builds a service worker with `registerType: 'autoUpdate'`, so a
+new deploy takes over on the next load without a prompt. The web manifest sets the
+theme and background colour to `#2f2f2f` with `display: standalone`.
+
+The service worker is **disabled in dev** (`devOptions.enabled` in
+`vite.config.ts`) so it cannot cache stale modules while you work. Flip that flag
+if you need to test install and update behaviour locally.
+
+### Icons
+
+`public/pwa-192x192.png`, `public/pwa-512x512.png` and
+`public/pwa-maskable-512x512.png` are placeholders. They are flat coloured
+circles on the theme background, generated by
+`scripts/generate-placeholder-icons.mjs` with no image dependency:
+
+```bash
+node scripts/generate-placeholder-icons.mjs
+```
+
+Replace them with real artwork, keeping the same filenames and the maskable
+safe zone, then delete the script.
+
+## Dates
+
+Check-in dates are stored as plain `YYYY-MM-DD` strings in the user's local
+calendar. Never convert through UTC to decide which day a check-in belongs to.
+See the rule in `AGENTS.md`.
+
+## Android
+
+Capacitor wraps the web build. Nothing is generated yet.
+
+```bash
+npm run build
+npx cap add android
+npx cap sync
+npx cap open android
+```
+
+`android/` is gitignored. Release signing material must never be committed; see
+`AGENTS.md`.
+
+## Conventions
+
+Read `AGENTS.md` before making changes. It holds the rules that apply to every
+change in this repo.
