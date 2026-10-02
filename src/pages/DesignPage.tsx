@@ -596,7 +596,9 @@ export function DesignPage() {
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-10 px-4 py-8 sm:px-6 sm:py-12">
       <header className="flex flex-col gap-3 border-b border-border-dark pb-6">
-        <Logo size="lg" />
+        <h1>
+          <Logo size="lg" />
+        </h1>
         <p className="max-w-prose text-sm text-text-muted-on-dark">
           Design system review. Every component in every state, on the dark background. Checked
           against WCAG AA at 360px, 768px and 1280px.
