@@ -1,6 +1,4 @@
-import { Link } from 'react-router-dom'
-
-import { Button } from '@/components/ui/Button'
+import { ButtonLink } from '@/components/ui/Button'
 
 /**
  * The app is still a shell. This exists to keep the routes mounted and to give
@@ -16,9 +14,9 @@ export function HomePage() {
       </p>
 
       <div className="flex flex-wrap gap-2">
-        <Link to="/design">
-          <Button variant="secondary">Open design system</Button>
-        </Link>
+        <ButtonLink to="/design" variant="secondary">
+          Open design system
+        </ButtonLink>
       </div>
     </main>
   )

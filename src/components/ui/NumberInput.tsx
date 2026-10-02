@@ -1,4 +1,4 @@
-import { useId, type InputHTMLAttributes } from 'react'
+import { useId, useState, type InputHTMLAttributes } from 'react'
 
 import { isAtBound, stepValue } from '@/lib/numbers'
 
@@ -71,17 +71,30 @@ export function NumberInput({
   const errorId = `${fieldId}-error`
   const describedBy = error !== undefined ? errorId : hint !== undefined ? hintId : undefined
 
+  // Raw text while the field has focus. Clamping on every keystroke would fight
+  // the user: typing "-40" would snap to the minimum after the "-" and the rest
+  // would land in the wrong place. The draft is what is displayed; the clamped
+  // value is what is emitted. The draft clears on blur and on a stepper press.
+  const [draft, setDraft] = useState<string | null>(null)
+
   const canDecrement = !disabled && !isAtBound(value, -step, min, max)
   const canIncrement = !disabled && !isAtBound(value, step, min, max)
 
   const applyStep = (direction: 1 | -1) => {
+    setDraft(null)
     onValueChange(stepValue(value, step * direction, min, max))
   }
 
   const handleChange = (next: string) => {
+    setDraft(next)
+
+    if (next.trim() === '') {
+      return
+    }
+
     const parsed = Number(next)
 
-    if (next.trim() === '' || Number.isNaN(parsed)) {
+    if (Number.isNaN(parsed)) {
       return
     }
 
@@ -121,7 +134,7 @@ export function NumberInput({
           id={fieldId}
           type="number"
           inputMode="numeric"
-          value={value}
+          value={draft ?? value}
           min={min}
           max={max}
           step={step}
@@ -130,6 +143,9 @@ export function NumberInput({
           aria-describedby={describedBy}
           onChange={(event) => {
             handleChange(event.target.value)
+          }}
+          onBlur={() => {
+            setDraft(null)
           }}
           className="tabular h-10 w-full min-w-0 border-x border-border-dark bg-transparent px-3 text-center
             text-sm text-text-on-dark [appearance:textfield] disabled:cursor-not-allowed

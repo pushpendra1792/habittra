@@ -2,8 +2,10 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
 import type { ButtonSize, ButtonVariant } from './Button'
 
-export interface IconButtonProps
-  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'aria-label' | 'children'> {
+export interface IconButtonProps extends Omit<
+  ButtonHTMLAttributes<HTMLButtonElement>,
+  'aria-label' | 'children'
+> {
   /**
    * Required. An icon-only control has no visible text, so the accessible name
    * must be supplied by the caller. The type system enforces it: this prop has

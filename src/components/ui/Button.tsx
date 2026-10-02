@@ -1,9 +1,10 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
 export type ButtonSize = 'sm' | 'md' | 'lg'
 
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonStyleProps {
   /** Visual weight. Primary is the single call to action on a screen. */
   variant?: ButtonVariant
   size?: ButtonSize
@@ -13,6 +14,18 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   iconStart?: ReactNode
   children?: ReactNode
 }
+
+export type ButtonProps = ButtonStyleProps & ButtonHTMLAttributes<HTMLButtonElement>
+
+/**
+ * Same visual language as Button but always a link. Exists so a button that
+ * navigates does not have to be a Button nested inside a Link, which is
+ * invalid HTML and confuses assistive tech.
+ */
+export type ButtonLinkProps = ButtonStyleProps &
+  Omit<AnchorHTMLAttributes<HTMLAnchorElement>, keyof ButtonStyleProps> & {
+    to: string
+  }
 
 const base =
   'inline-flex items-center justify-center gap-2 rounded-sm font-medium whitespace-nowrap ' +
@@ -31,6 +44,10 @@ const sizes: Record<ButtonSize, string> = {
   sm: 'h-8 px-3 text-xs',
   md: 'h-10 px-4 text-sm',
   lg: 'h-12 px-5 text-base',
+}
+
+function classesFor(variant: ButtonVariant, size: ButtonSize, className: string) {
+  return `${base} ${variants[variant]} ${sizes[size]} ${className}`
 }
 
 function Spinner() {
@@ -53,6 +70,24 @@ function Spinner() {
   )
 }
 
+function Content({
+  loading,
+  iconStart,
+  children,
+}: {
+  loading: boolean
+  iconStart?: ReactNode
+  children?: ReactNode
+}) {
+  return (
+    <>
+      {loading ? <Spinner /> : null}
+      {loading ? null : iconStart}
+      {children}
+    </>
+  )
+}
+
 /** Primary action control. Variants differ in fill and border, not colour alone. */
 export function Button({
   variant = 'primary',
@@ -69,12 +104,35 @@ export function Button({
       type="button"
       disabled={disabled === true || loading}
       aria-busy={loading || undefined}
-      className={`${base} ${variants[variant]} ${sizes[size]} ${className}`}
+      className={classesFor(variant, size, className)}
       {...rest}
     >
-      {loading ? <Spinner /> : null}
-      {loading ? null : iconStart}
-      {children}
+      <Content loading={loading} iconStart={iconStart}>
+        {children}
+      </Content>
     </button>
+  )
+}
+
+/**
+ * Same visual language as Button but always a link. Prefer this over `to` on
+ * Button when the caller wants the link type rather than a union prop.
+ */
+export function ButtonLink({
+  variant = 'primary',
+  size = 'md',
+  loading = false,
+  iconStart,
+  className = '',
+  children,
+  to,
+  ...rest
+}: ButtonLinkProps) {
+  return (
+    <Link to={to} className={classesFor(variant, size, className)} {...rest}>
+      <Content loading={loading} iconStart={iconStart}>
+        {children}
+      </Content>
+    </Link>
   )
 }

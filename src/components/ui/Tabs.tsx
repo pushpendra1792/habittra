@@ -36,10 +36,29 @@ export function Tabs({ items, value, onChange, ariaLabel, stretch = false }: Tab
 
   const selectedIndex = items.findIndex((item) => item.id === value)
 
-  const focusAt = (index: number) => {
-    const item = items[((index % items.length) + items.length) % items.length]
+  /**
+   * Walks from index in the given direction until it finds an enabled tab,
+   * wrapping at both ends. Searching in the direction of travel is what makes a
+   * backwards move skip backwards rather than wrap forward onto the current tab.
+   */
+  const nextSelectableItem = (index: number, direction: 1 | -1) => {
+    for (let offset = 0; offset < items.length; offset += 1) {
+      const raw = index + direction * offset
+      const candidate = ((raw % items.length) + items.length) % items.length
+      const item = items[candidate]
 
-    if (!isSelectable(item)) {
+      if (isSelectable(item)) {
+        return item
+      }
+    }
+
+    return undefined
+  }
+
+  const focusAt = (index: number, direction: 1 | -1) => {
+    const item = nextSelectableItem(index, direction)
+
+    if (item === undefined) {
       return
     }
 
@@ -54,23 +73,23 @@ export function Tabs({ items, value, onChange, ariaLabel, stretch = false }: Tab
       case 'ArrowRight':
       case 'ArrowDown': {
         event.preventDefault()
-        focusAt(selectedIndex + 1)
+        focusAt(selectedIndex + 1, 1)
         break
       }
       case 'ArrowLeft':
       case 'ArrowUp': {
         event.preventDefault()
-        focusAt(selectedIndex - 1)
+        focusAt(selectedIndex - 1, -1)
         break
       }
       case 'Home': {
         event.preventDefault()
-        focusAt(0)
+        focusAt(0, 1)
         break
       }
       case 'End': {
         event.preventDefault()
-        focusAt(items.length - 1)
+        focusAt(items.length - 1, -1)
         break
       }
       default:
