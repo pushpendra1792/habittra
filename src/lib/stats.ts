@@ -10,6 +10,7 @@
  * Every function is pure: same inputs, same output, no clock and no fetch.
  * "Now" always arrives as an argument, which is what makes them testable.
  */
+import { parseDateString, toDateString } from '@/lib/dates'
 import { clampPercent } from '@/lib/numbers'
 import type { Checkin, DateString, Habit, MonthKey } from '@/types'
 
@@ -399,4 +400,89 @@ export function successMessage(pct: number): string {
   }
 
   return 'Fresh start, one tap at a time'
+}
+
+/** Moves a day by whole days, crossing month and year boundaries. */
+function shiftDay(date: DateString, days: number): DateString {
+  const moved = parseDateString(date)
+
+  // setDate rolls over into the next or previous month on its own. It is local
+  // calendar arithmetic, so it stays correct across a daylight saving change,
+  // where two consecutive days are 23 or 25 hours apart in milliseconds.
+  moved.setDate(moved.getDate() + days)
+
+  return toDateString(moved)
+}
+
+/** The distinct days a habit was checked in, in calendar order. */
+function daysCheckedIn(habitId: string, checkins: readonly Checkin[]): DateString[] {
+  const days = new Set<DateString>()
+
+  for (const checkin of checkins) {
+    if (checkin.habitId === habitId) {
+      days.add(checkin.date)
+    }
+  }
+
+  return [...days].sort()
+}
+
+/**
+ * Consecutive days up to today, ending today or yesterday.
+ *
+ *   while the previous calendar day was also checked in, count it
+ *
+ * Today not being checked in yet does not break the streak: the day is not over
+ * until it is, so a user who has checked in every morning still sees yesterday's
+ * run at 8am. Yesterday not being checked in does break it, because that day is
+ * gone. Duplicates count once, and only the last `today` matters.
+ *
+ * Returns 0 when neither today nor yesterday was checked in.
+ */
+export function currentStreak(
+  habitId: string,
+  checkins: readonly Checkin[],
+  today: DateString,
+): number {
+  const days = new Set(daysCheckedIn(habitId, checkins))
+  let cursor = days.has(today) ? today : shiftDay(today, -1)
+
+  if (!days.has(cursor)) {
+    return 0
+  }
+
+  let streak = 0
+
+  while (days.has(cursor)) {
+    streak += 1
+    cursor = shiftDay(cursor, -1)
+  }
+
+  return streak
+}
+
+/**
+ * The longest run of consecutive days ever checked in, across all history.
+ *
+ * Sorts the distinct days and starts a new run whenever a day is not the
+ * calendar day after the one before it. Duplicates and check-ins for other
+ * habits are ignored. Returns 0 with no check-ins.
+ *
+ * Compared by calendar day rather than by timestamp, so a run that crosses a
+ * daylight saving change is still one streak.
+ */
+export function longestStreak(habitId: string, checkins: readonly Checkin[]): number {
+  const days = daysCheckedIn(habitId, checkins)
+
+  let longest = 0
+  let run = 0
+  let previous: DateString | undefined
+
+  for (const day of days) {
+    run = previous !== undefined && shiftDay(previous, 1) === day ? run + 1 : 1
+    longest = Math.max(longest, run)
+    previous = day
+  }
+
+  return longest
 }

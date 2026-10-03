@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  currentStreak,
   dailyCounts,
   daysInMonth,
   elapsedDays,
   habitCompleted,
   habitProgressPct,
+  longestStreak,
   momentumPct,
   monthlyProgressPct,
   normalizedProgressPct,
@@ -843,5 +845,173 @@ describe('successMessage', () => {
     expect(successMessage(39)).toBe('Fresh start, one tap at a time')
     expect(successMessage(1)).toBe('Fresh start, one tap at a time')
     expect(successMessage(0)).toBe('Fresh start, one tap at a time')
+  })
+})
+
+describe('currentStreak', () => {
+  const habitId = 'habit-1'
+
+  it('is 0 with no check-ins at all', () => {
+    expect(currentStreak(habitId, [], JULY_22)).toBe(0)
+  })
+
+  it('is 0 when nothing was checked in today or yesterday', () => {
+    const checkins = checkinsOn(habitId, JULY, [20, 18])
+
+    expect(currentStreak(habitId, checkins, JULY_22)).toBe(0)
+  })
+
+  it('counts back from today', () => {
+    const checkins = checkinsOn(habitId, JULY, [20, 21, 22])
+
+    expect(currentStreak(habitId, checkins, JULY_22)).toBe(3)
+  })
+
+  it('counts a single day', () => {
+    expect(currentStreak(habitId, checkinsOn(habitId, JULY, [22]), JULY_22)).toBe(1)
+  })
+
+  it('survives today not being checked in yet', () => {
+    const checkins = checkinsOn(habitId, JULY, [20, 21])
+
+    expect(currentStreak(habitId, checkins, JULY_22)).toBe(2)
+  })
+
+  it('is broken by a missed day', () => {
+    const checkins = checkinsOn(habitId, JULY, [18, 19, 20, 22])
+
+    expect(currentStreak(habitId, checkins, JULY_22)).toBe(1)
+  })
+
+  it('is broken by a missed yesterday', () => {
+    expect(currentStreak(habitId, checkinsOn(habitId, JULY, [20]), JULY_22)).toBe(0)
+  })
+
+  it('counts a run that crosses a month boundary', () => {
+    const checkins = [
+      ...checkinsOn(habitId, '2023-06', [29, 30]),
+      ...checkinsOn(habitId, JULY, [1]),
+    ]
+
+    expect(currentStreak(habitId, checkins, JULY_22)).toBe(0)
+    expect(currentStreak(habitId, checkins, '2023-07-01')).toBe(3)
+  })
+
+  it('counts a run that crosses a year boundary', () => {
+    const checkins = [
+      ...checkinsOn(habitId, '2022-12', [30, 31]),
+      ...checkinsOn(habitId, '2023-01', [1]),
+    ]
+
+    expect(currentStreak(habitId, checkins, '2023-01-01')).toBe(3)
+  })
+
+  it('counts a run that covers every day of a leap February', () => {
+    expect(currentStreak(habitId, checkinsOn(habitId, '2024-02', daysUpTo(29)), '2024-02-29')).toBe(
+      29,
+    )
+  })
+
+  it('counts a run that covers every day of a non-leap February', () => {
+    expect(currentStreak(habitId, checkinsOn(habitId, '2023-02', daysUpTo(28)), '2023-02-28')).toBe(
+      28,
+    )
+  })
+
+  it('is not extended by a check-in in a later month', () => {
+    const checkins = [
+      ...checkinsOn(habitId, JULY, [21, 22]),
+      ...checkinsOn(habitId, '2023-08', [1, 2, 3]),
+    ]
+
+    expect(currentStreak(habitId, checkins, JULY_22)).toBe(2)
+  })
+
+  it('counts duplicates of a day once', () => {
+    const checkins = [
+      ...checkinsOn(habitId, JULY, [21, 22, 22]),
+      makeCheckin({ habitId, date: '2023-07-22' }),
+    ]
+
+    expect(currentStreak(habitId, checkins, JULY_22)).toBe(2)
+  })
+
+  it('ignores check-ins for other habits', () => {
+    expect(currentStreak(habitId, checkinsOn('habit-2', JULY, daysUpTo(22)), JULY_22)).toBe(0)
+  })
+
+  it('is 0 on the first day of a month with only that day checked in', () => {
+    expect(currentStreak(habitId, checkinsOn(habitId, JULY, [1]), '2023-07-01')).toBe(1)
+    expect(currentStreak(habitId, [], '2023-07-01')).toBe(0)
+  })
+})
+
+describe('longestStreak', () => {
+  const habitId = 'habit-1'
+
+  it('is 0 with no check-ins at all', () => {
+    expect(longestStreak(habitId, [])).toBe(0)
+  })
+
+  it('is 1 for a single isolated day', () => {
+    expect(longestStreak(habitId, checkinsOn(habitId, JULY, [15]))).toBe(1)
+  })
+
+  it('finds the longest run anywhere in the month', () => {
+    const checkins = checkinsOn(habitId, JULY, [1, 2, 3, 10, 11, 12, 13, 20, 21, 22])
+
+    expect(longestStreak(habitId, checkins)).toBe(4)
+  })
+
+  it('spans months and years', () => {
+    const checkins = [
+      ...checkinsOn(habitId, '2022-12', [30, 31]),
+      ...checkinsOn(habitId, '2023-01', [1, 2]),
+      ...checkinsOn(habitId, JULY, [5, 6]),
+    ]
+
+    expect(longestStreak(habitId, checkins)).toBe(4)
+  })
+
+  it('counts a run that covers every day of a leap February', () => {
+    expect(longestStreak(habitId, checkinsOn(habitId, '2024-02', daysUpTo(29)))).toBe(29)
+  })
+
+  it('counts a run that covers every day of a 31 day month', () => {
+    expect(longestStreak(habitId, checkinsOn(habitId, JULY, daysUpTo(31)))).toBe(31)
+  })
+
+  it('does not join two runs across a gap', () => {
+    expect(longestStreak(habitId, checkinsOn(habitId, JULY, [1, 2, 3, 5, 6, 7]))).toBe(3)
+  })
+
+  it('does not join runs across a month boundary that has a gap in it', () => {
+    // 1 August is the day after 31 July, but 2 August is not.
+    const joined = [...checkinsOn(habitId, '2023-07', [31]), ...checkinsOn(habitId, '2023-08', [1])]
+    const gapped = [...checkinsOn(habitId, '2023-07', [31]), ...checkinsOn(habitId, '2023-08', [2])]
+
+    expect(longestStreak(habitId, joined)).toBe(2)
+    expect(longestStreak(habitId, gapped)).toBe(1)
+  })
+
+  it('counts duplicates of a day once', () => {
+    const checkins = [
+      ...checkinsOn(habitId, JULY, [1, 2]),
+      makeCheckin({ habitId, date: '2023-07-02' }),
+    ]
+
+    expect(longestStreak(habitId, checkins)).toBe(2)
+  })
+
+  it('ignores check-ins for other habits', () => {
+    expect(longestStreak(habitId, checkinsOn('habit-2', JULY, daysUpTo(10)))).toBe(0)
+  })
+
+  it('is never shorter than the current streak', () => {
+    const checkins = checkinsOn(habitId, JULY, [...daysUpTo(3), ...daysUpTo(22)])
+
+    expect(longestStreak(habitId, checkins)).toBeGreaterThanOrEqual(
+      currentStreak(habitId, checkins, JULY_22),
+    )
   })
 })
