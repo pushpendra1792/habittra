@@ -48,7 +48,7 @@ const HABIT_SPECS: readonly SampleHabit[] = [
   },
   {
     name: 'Walk 10,000 steps',
-    monthlyGoal: 10,
+    monthlyGoal: 7,
     days: [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 18, 20, 22],
   },
   {

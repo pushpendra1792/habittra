@@ -24,7 +24,7 @@ import {
 import { HABIT_NAME_MAX_LENGTH, MONTHLY_GOAL_MAX, MONTHLY_GOAL_MIN } from '@/types'
 
 describe('sample data', () => {
-  it('has the nine demo habits in order, with the goals it claims', () => {
+  it('has the nine demo habits in order', () => {
     expect(SAMPLE_HABITS.map((habit) => habit.name)).toEqual([
       'Stretch or do yoga',
       'Walk 10,000 steps',
@@ -36,10 +36,18 @@ describe('sample data', () => {
       'Volunteer',
       'Put $10 to savings',
     ])
+  })
 
+  it('uses the monthly goals from the reference list, in order, adding up to 84', () => {
     expect(SAMPLE_HABITS.map((habit) => habit.monthlyGoal)).toEqual([
-      5, 10, 15, 4, 20, 10, 10, 3, 10,
+      5, 7, 15, 4, 20, 10, 10, 3, 10,
     ])
+
+    // 5 + 7 + 15 + 4 + 20 + 10 + 10 + 3 + 10 = 84, the figure the percentage
+    // examples in @/lib/stats are worked out from.
+    const sum = SAMPLE_HABITS.reduce((total, habit) => total + habit.monthlyGoal, 0)
+
+    expect(sum).toBe(84)
   })
 
   it('stays inside the domain rules', () => {
@@ -118,17 +126,28 @@ describe('sample data', () => {
   it('produces sensible numbers through the statistics', () => {
     const monthTotals = totals(SAMPLE_HABITS, SAMPLE_CHECKINS, SAMPLE_MONTH)
 
-    // 68 check-ins against a goal of 87. Two habits are past their own goal, so
-    // the raw count and the capped count differ, which is the whole point of
-    // keeping both.
-    expect(monthTotals).toEqual({ completed: 68, goal: 87, cappedCompleted: 61 })
-    expect(Number(monthlyProgressPct(monthTotals).toFixed(1))).toBe(70.1)
+    // Check-ins per habit:  8, 14, 15, 4, 9, 8, 3, 2, 5  = 68
+    // Goals per habit:      5,  7, 15, 4, 20, 10, 10, 3, 10 = 84
+    // Capped per habit:     5,  7, 15, 4,  9,  8,  3, 2,  5 = 58
+    // Stretch, Walk and Read are past their own goals, so the raw count and the
+    // capped count differ, which is the whole point of keeping both.
+    expect(monthTotals).toEqual({ completed: 68, goal: 84, cappedCompleted: 58 })
+
+    // 58 / 84 = 69.0476%, shown to one decimal as 69.0%.
+    expect(Number(monthlyProgressPct(monthTotals).toFixed(1))).toBe(69)
+
+    // 58 / (84 * 22 / 31) = 1798 / 1848 = 97.2944%, so 97.3% of the pace so far.
     expect(Number(normalizedProgressPct(monthTotals, SAMPLE_MONTH, SAMPLE_TODAY).toFixed(1))).toBe(
-      98.8,
+      97.3,
     )
+
+    // The window is the 20th to the 22nd: 3 + 8 + 1 check-ins, against an expected
+    // 84 / 31 * 3 = 8.129. That is 147.6% and momentum stops at 100.
     expect(momentumPct(SAMPLE_HABITS, SAMPLE_CHECKINS, SAMPLE_MONTH, SAMPLE_TODAY)).toBe(100)
 
-    // 22 of 31 days gone, so nobody is asked for a whole month goal yet.
+    // 22 of 31 days gone, so each habit is asked for floor(goal * 22 / 31):
+    // 3, 4, 10, 2, 14, 7, 7, 2, 7. Six habits are at or past that and three are
+    // not (Floss, Call grandpa, Put $10 to savings), so 6 / 9 = 66.67% -> 67.
     const rate = successRatePct(SAMPLE_HABITS, SAMPLE_CHECKINS, SAMPLE_MONTH, SAMPLE_TODAY)
 
     expect(rate).toBe(67)
