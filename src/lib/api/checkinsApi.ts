@@ -1,0 +1,108 @@
+/**
+ * Check-ins: the only way in or out of the checkins table.
+ *
+ * The one rule that shapes this file is that a check-in belongs to a calendar
+ * day in the user's own timezone. Every date that arrives here is already a
+ * `YYYY-MM-DD` string built by @/lib/dates, and it goes to the database and back
+ * unchanged. Nothing in this file constructs a `Date`, and nothing calls
+ * `toISOString()`, which would move a check-in to the wrong day for anyone west
+ * of Greenwich in the evening. See the date rules in AGENTS.md.
+ */
+import { addMonths } from '@/lib/dates'
+import { getSupabaseClient } from '@/lib/supabase'
+import type { Checkin, DateString, MonthKey } from '@/types'
+
+import { isCheckinAlreadyRecorded } from './errors'
+import { toCheckinInsert, toCheckins } from './rows'
+import type { Unsubscribe } from './habitsApi'
+
+/** First day of the month, which is the lower bound of the range query. */
+const MONTH_START_SUFFIX = '-01'
+
+/**
+ * This user's check-ins for one month, oldest first.
+ *
+ * Bounded on both sides rather than filtered in JavaScript: a user with years of
+ * history would otherwise download all of it to render one month.
+ *
+ * The bounds are half open, `>= 2023-07-01 and < 2023-08-01`, so the last day of
+ * the month is included and the first of the next is not. Comparing dates as
+ * strings is safe here because Postgres is comparing two `date` values, not
+ * text; the month key is zero padded, so the string it builds is well formed.
+ */
+export async function listCheckinsForMonth(monthKey: MonthKey): Promise<Checkin[]> {
+  const nextMonth = addMonths(monthKey, 1)
+
+  const { data, error } = await getSupabaseClient()
+    .from('checkins')
+    .select('*')
+    .gte('date', `${monthKey}${MONTH_START_SUFFIX}`)
+    .lt('date', `${nextMonth}${MONTH_START_SUFFIX}`)
+    .order('date', { ascending: true })
+    .order('id', { ascending: true })
+
+  if (error !== null) {
+    throw error
+  }
+
+  return toCheckins(data)
+}
+
+/**
+ * Records a check-in.
+ *
+ * Idempotent: checking the same day twice is not an error, it is the same state
+ * reached twice. The unique constraint on (habit_id, date) is what settles a race
+ * between two devices tapping at once, and losing that race is treated as
+ * success rather than shown to the user as a failure. Anything else that goes
+ * wrong still throws.
+ */
+export async function checkIn(habitId: string, date: DateString): Promise<void> {
+  const { error } = await getSupabaseClient()
+    .from('checkins')
+    .insert(toCheckinInsert(habitId, date))
+
+  if (error !== null && !isCheckinAlreadyRecorded(error)) {
+    throw error
+  }
+}
+
+/**
+ * Removes a check-in.
+ *
+ * Idempotent for the same reason `checkIn` is: removing a day that was never
+ * checked in leaves the day unchecked, which is the state asked for. PostgREST
+ * reports zero affected rows as a success, so there is nothing to check.
+ */
+export async function undoCheckin(habitId: string, date: DateString): Promise<void> {
+  const { error } = await getSupabaseClient()
+    .from('checkins')
+    .delete()
+    .eq('habit_id', habitId)
+    .eq('date', date)
+
+  if (error !== null) {
+    throw error
+  }
+}
+
+/**
+ * Calls `onChange` whenever a check-in changes on any device.
+ *
+ * Re-reads the affected month rather than applying a diff, for the reason given
+ * on `subscribeToHabits`: a single new row moves several numbers at once.
+ *
+ * Realtime does not deliver events for rows the subscriber cannot select, so
+ * there is no user filter here.
+ */
+export function subscribeToCheckins(monthKey: MonthKey, onChange: () => void): Unsubscribe {
+  const client = getSupabaseClient()
+  const channel = client
+    .channel(`checkins:${monthKey}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'checkins' }, onChange)
+    .subscribe()
+
+  return () => {
+    void client.removeChannel(channel)
+  }
+}
