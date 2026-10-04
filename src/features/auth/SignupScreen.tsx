@@ -15,14 +15,13 @@ import { AuthLayout } from '@/features/auth/AuthLayout'
 import { FormMessage } from '@/features/auth/FormMessage'
 import { AuthDivider, GoogleButton } from '@/features/auth/GoogleButton'
 import { googleAuthEnabled } from '@/features/auth/googleAuth'
+import { NOT_CONFIGURED_MESSAGE } from '@/features/auth/notConfigured'
 import { redirectTarget } from '@/features/auth/redirects'
 import { isValid, validateSignUp, type FieldErrors } from '@/features/auth/validation'
 import { useAuth } from '@/hooks/useAuth'
 import { authErrorMessage } from '@/lib/api/errors'
 
 const googleEnabled = googleAuthEnabled()
-
-const NOT_CONFIGURED = 'Supabase is not set up. See SETUP_SUPABASE.md.'
 
 export function SignupScreen() {
   const { status, signUpWithPassword, signInWithGoogle } = useAuth()
@@ -51,6 +50,13 @@ export function SignupScreen() {
       return
     }
 
+    // Enabled on purpose when Supabase is not set up: the form still checks
+    // itself and the message below still says why nothing will happen. Only the
+    // request is withheld.
+    if (unconfigured) {
+      return
+    }
+
     setBusy('email')
 
     try {
@@ -70,6 +76,11 @@ export function SignupScreen() {
 
   async function continueWithGoogle() {
     setGoogleError(null)
+
+    if (unconfigured) {
+      return
+    }
+
     setBusy('google')
 
     try {
@@ -150,12 +161,12 @@ export function SignupScreen() {
         />
 
         {unconfigured ? (
-          <FormMessage message={NOT_CONFIGURED} />
+          <FormMessage message={NOT_CONFIGURED_MESSAGE} />
         ) : (
           <FormMessage message={emailError} />
         )}
 
-        <Button type="submit" size="lg" loading={busy === 'email'} disabled={unconfigured}>
+        <Button type="submit" size="lg" loading={busy === 'email'}>
           Create account
         </Button>
       </form>
@@ -169,11 +180,11 @@ export function SignupScreen() {
               void continueWithGoogle()
             }}
             loading={busy === 'google'}
-            disabled={busy === 'email' || unconfigured}
+            disabled={busy !== null}
           />
 
           {unconfigured ? (
-            <FormMessage message={NOT_CONFIGURED} />
+            <FormMessage message={NOT_CONFIGURED_MESSAGE} />
           ) : (
             <FormMessage message={googleError} />
           )}

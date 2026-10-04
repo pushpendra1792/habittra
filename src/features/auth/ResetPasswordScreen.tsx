@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { AuthLayout } from '@/features/auth/AuthLayout'
 import { FormMessage } from '@/features/auth/FormMessage'
+import { NOT_CONFIGURED_MESSAGE } from '@/features/auth/notConfigured'
 import {
   isValid,
   validateNewPassword,
@@ -24,8 +25,6 @@ import {
 } from '@/features/auth/validation'
 import { useAuth } from '@/hooks/useAuth'
 import { authErrorMessage } from '@/lib/api/errors'
-
-const NOT_CONFIGURED = 'Supabase is not set up. See SETUP_SUPABASE.md.'
 
 export function ResetPasswordScreen() {
   const { status, isRecovery, sendPasswordResetEmail, updatePassword } = useAuth()
@@ -53,6 +52,13 @@ export function ResetPasswordScreen() {
       return
     }
 
+    // Enabled on purpose when Supabase is not set up: the form still checks
+    // itself and the message below still says why nothing will happen. Only the
+    // request is withheld.
+    if (unconfigured) {
+      return
+    }
+
     setBusy(true)
 
     try {
@@ -74,6 +80,10 @@ export function ResetPasswordScreen() {
     setFormError(null)
 
     if (!isValid(errors)) {
+      return
+    }
+
+    if (unconfigured) {
       return
     }
 
@@ -130,12 +140,12 @@ export function ResetPasswordScreen() {
           />
 
           {unconfigured ? (
-            <FormMessage message={NOT_CONFIGURED} />
+            <FormMessage message={NOT_CONFIGURED_MESSAGE} />
           ) : (
             <FormMessage message={formError} />
           )}
 
-          <Button type="submit" size="lg" loading={busy} disabled={unconfigured}>
+          <Button type="submit" size="lg" loading={busy}>
             Save new password
           </Button>
         </form>
@@ -174,12 +184,12 @@ export function ResetPasswordScreen() {
           />
 
           {unconfigured ? (
-            <FormMessage message={NOT_CONFIGURED} />
+            <FormMessage message={NOT_CONFIGURED_MESSAGE} />
           ) : (
             <FormMessage message={formError} />
           )}
 
-          <Button type="submit" size="lg" loading={busy} disabled={unconfigured}>
+          <Button type="submit" size="lg" loading={busy}>
             Send reset link
           </Button>
         </form>

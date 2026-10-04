@@ -75,10 +75,22 @@ test('every auth screen loads without console errors', async ({ page }) => {
 test('a build with no Supabase keys says so instead of failing silently', async ({ page }) => {
   await page.goto('/login')
 
-  // No keys means no session and no request. The screen has to say which of the
-  // two variables is missing rather than sitting on an inert form.
+  // No keys means no session and no request. The screen has to say which is
+  // missing rather than sitting on an inert form that looks like it is working.
   await expect(page.getByText('Supabase is not set up. See SETUP_SUPABASE.md.')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Sign in' })).toBeDisabled()
+
+  // The button is not disabled. A disabled button hides the reason from the
+  // person using it; here the form still checks itself and the message above
+  // still says why nothing will happen.
+  await expect(page.getByRole('button', { name: 'Sign in' })).toBeEnabled()
+
+  await page.getByLabel('Email').fill('pushp@example.com')
+  await page.getByLabel('Password').fill('correct horse')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+
+  // Valid input, so the only thing left to report is the missing configuration.
+  await expect(page.getByText('Supabase is not set up. See SETUP_SUPABASE.md.')).toBeVisible()
+  await expect(page).toHaveURL(/\/login$/)
 })
 
 test('the Google button is hidden unless the flag is on', async ({ page }) => {
@@ -177,7 +189,7 @@ test('every field on every auth screen has an accessible name', async ({ page })
   }
 })
 
-test('the auth screens fit 360px without sideways scrolling', async ({ page }) => {
+test('the auth screens never scroll sideways', async ({ page }) => {
   for (const path of ['/login', '/signup', '/reset-password']) {
     await page.goto(path)
 
@@ -187,6 +199,6 @@ test('the auth screens fit 360px without sideways scrolling', async ({ page }) =
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     )
 
-    expect(overflow, `${path} scrolls sideways at 360px`).toBeLessThanOrEqual(0)
+    expect(overflow, `${path} scrolls sideways`).toBeLessThanOrEqual(0)
   }
 })

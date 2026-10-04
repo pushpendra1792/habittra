@@ -16,6 +16,7 @@ import { AuthLayout } from '@/features/auth/AuthLayout'
 import { FormMessage } from '@/features/auth/FormMessage'
 import { AuthDivider, GoogleButton } from '@/features/auth/GoogleButton'
 import { googleAuthEnabled } from '@/features/auth/googleAuth'
+import { NOT_CONFIGURED_MESSAGE } from '@/features/auth/notConfigured'
 import { redirectTarget } from '@/features/auth/redirects'
 import { isValid, validateSignIn, type FieldErrors } from '@/features/auth/validation'
 import { useAuth } from '@/hooks/useAuth'
@@ -23,8 +24,6 @@ import { authErrorMessage } from '@/lib/api/errors'
 
 /** Read once: it is a build-time variable, so it cannot change while the app runs. */
 const googleEnabled = googleAuthEnabled()
-
-const NOT_CONFIGURED = 'Supabase is not set up. See SETUP_SUPABASE.md.'
 
 export function LoginScreen() {
   const { status, signInWithPassword, signInWithGoogle } = useAuth()
@@ -51,6 +50,14 @@ export function LoginScreen() {
       return
     }
 
+    // The button stays enabled when Supabase is not set up, so the form still
+    // checks itself and the message below still explains why nothing will happen.
+    // Only the request is withheld. A disabled button would make the whole form
+    // look broken and would give the person nothing to act on.
+    if (unconfigured) {
+      return
+    }
+
     setBusy('email')
 
     try {
@@ -65,6 +72,11 @@ export function LoginScreen() {
 
   async function continueWithGoogle() {
     setGoogleError(null)
+
+    if (unconfigured) {
+      return
+    }
+
     setBusy('google')
 
     try {
@@ -127,12 +139,12 @@ export function LoginScreen() {
         </div>
 
         {unconfigured ? (
-          <FormMessage message={NOT_CONFIGURED} />
+          <FormMessage message={NOT_CONFIGURED_MESSAGE} />
         ) : (
           <FormMessage message={emailError} />
         )}
 
-        <Button type="submit" size="lg" loading={busy === 'email'} disabled={unconfigured}>
+        <Button type="submit" size="lg" loading={busy === 'email'}>
           Sign in
         </Button>
       </form>
@@ -146,11 +158,11 @@ export function LoginScreen() {
               void continueWithGoogle()
             }}
             loading={busy === 'google'}
-            disabled={busy === 'email' || unconfigured}
+            disabled={busy !== null}
           />
 
           {unconfigured ? (
-            <FormMessage message={NOT_CONFIGURED} />
+            <FormMessage message={NOT_CONFIGURED_MESSAGE} />
           ) : (
             <FormMessage message={googleError} />
           )}
