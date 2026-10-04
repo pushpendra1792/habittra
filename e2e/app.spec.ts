@@ -1,19 +1,8 @@
 import { expect, test } from '@playwright/test'
 
-test('app shell loads without console errors', async ({ page }) => {
-  const consoleErrors: string[] = []
-
-  page.on('console', (message) => {
-    if (message.type() === 'error') {
-      consoleErrors.push(message.text())
-    }
-  })
-
-  await page.goto('/')
-
-  await expect(page.getByRole('heading', { name: 'Habittra' })).toBeVisible()
-  expect(consoleErrors).toEqual([])
-})
+// `/` is behind the auth gate, so it is covered in auth.spec.ts: an anonymous
+// visitor is redirected to /login. The two tests here are the design review page
+// and the modal behaviour, which do not depend on a session.
 
 test('design review page renders every component section', async ({ page }) => {
   const consoleErrors: string[] = []
