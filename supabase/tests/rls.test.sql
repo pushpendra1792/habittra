@@ -58,8 +58,14 @@
 -- The statements run as the role they are written for, so they are refused by
 -- row-level security, not by a missing table privilege. That is why the file
 -- assumes Supabase's default grants on schema `public`: `anon` and
--- `authenticated` can select and write the three tables. A project that has
--- revoked those would fail loudly rather than quietly pass.
+-- `authenticated` can select and write the three tables.
+--
+-- Revoking those fails loudly for the reads and for the inserts, which are plain
+-- queries. It would not be loud for the refused updates and deletes:
+-- `tests.refused` counts a missing privilege as a refusal, since a statement that
+-- is not permitted has been refused either way. Those five assertions would then
+-- be asserting less than they claim, although the cross-account writes would
+-- still be impossible.
 --
 -- A refusal comes in two shapes and the helpers distinguish them:
 --
@@ -213,6 +219,43 @@ exception when others then
   return false;
 end;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- letting the other roles call the assertions
+-- ---------------------------------------------------------------------------
+--
+-- Everything below this line runs as `authenticated` or `anon`, and the first
+-- thing each assertion does is call a function in `tests`. A newly created schema
+-- grants nothing to anyone but its owner, so without this the run stops at the
+-- first assertion with `permission denied for schema tests` -- which says
+-- nothing about the policies, and looks like the file being broken.
+--
+-- Usage on the schema is what makes `tests` nameable at all; execute on the
+-- functions is what lets the roles call them. Both are granted here, before the
+-- first `set local role` below, and for the five functions created above, which
+-- is the whole of `tests`.
+--
+-- Nothing else needs a grant, and that is deliberate rather than lucky:
+--
+--   * The functions run `security invoker`, so a statement passed to
+--     `tests.refused` or `tests.lives` is executed as the role that called it,
+--     which is the whole point: the policies are what answer. Both take SQL that
+--     is schema qualified.
+--   * `tests.record` is the one `security definer`, and it is the only thing that
+--     touches `pg_temp.test_results` and pgTAP's own bookkeeping, so it does that
+--     as the session role, which owns the temp tables.
+--   * pgTAP in `extensions` is never called by the assertions themselves, only
+--     from inside `tests.record`; `plan()` and `finish()` run before the first
+--     role switch and after the last one.
+--   * The three tables need select and write privileges for `anon` and
+--     `authenticated`, which is Supabase's default on schema `public` and is
+--     assumed at the top of this file.
+--
+-- Both grants are inside the transaction that the rollback at the end closes, so
+-- they go away with everything else this file creates. There is no need to
+-- revoke them by hand.
+grant usage on schema tests to anon, authenticated;
+grant execute on all functions in schema tests to anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- fixtures
