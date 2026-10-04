@@ -42,6 +42,11 @@
 -- the role and the JWT claims. Every assertion is one user doing something to a
 -- row belonging to the other.
 --
+-- The fixtures are created the same way, as their own owner, because
+-- `set_row_user_id` stamps `auth.uid()` over the `user_id` on insert. A row
+-- created by the admin role with no session gets a null owner and the not-null
+-- constraint rejects it. See the note in the fixtures section.
+--
 -- Everything is in a transaction that is rolled back at the end, so it leaves
 -- nothing behind: no test users, no habits, no check-ins, and not even the
 -- `tests` schema, which is why the next run can be pasted in unchanged.
@@ -213,12 +218,13 @@ $$;
 -- fixtures
 -- ---------------------------------------------------------------------------
 
--- Belt and braces for a run that something other than this file left behind. The
--- rollback at the end means this file cannot leave a mess of its own, but a
--- connection that dropped mid-run can, and the unique index on auth.users.email
--- would then refuse the two rows below. Scoped to the two ids here, and undone
--- by the same rollback as everything else. The cascade takes their profiles,
--- habits and check-ins with them.
+-- Belt and braces. The rollback at the end means this file cannot leave anything
+-- behind, so this is only here for rows something else left on the same ids: an
+-- earlier version of this file that was committed, or a fixture inserted by hand
+-- while working out what a policy does. Without it the unique index on
+-- auth.users.email would refuse the two rows below. Scoped to the two ids used
+-- here, so it cannot touch a real account, and undone by the same rollback as
+-- everything else. The cascade takes their profiles, habits and check-ins too.
 delete from auth.users where id in (
   '11111111-1111-1111-1111-111111111111',
   '22222222-2222-2222-2222-222222222222'
@@ -226,8 +232,8 @@ delete from auth.users where id in (
 
 -- Two users. The columns listed are the ones a row created outside the auth
 -- server needs: raw_app_meta_data claims the email provider, which is what a user
--- created through /signup looks like, and raw_user_meta_data is what the trigger
--- below turns into profiles.display_name.
+-- created through /signup looks like, and raw_user_meta_data is what
+-- `handle_new_user` turns into profiles.display_name.
 --
 -- Both metadata columns are jsonb, so the display name is built with
 -- jsonb_build_object rather than by concatenating a string: `'{"a":"' || label ||
@@ -253,24 +259,58 @@ from (values
   ('22222222-2222-2222-2222-222222222222'::uuid, 'rls-b@example.test'::text, 'B'::text)
 ) as fixtures (id, email, label);
 
--- B's rows, plus A's. created_at is pinned to 2023 so the updated_at assertion
--- below can tell a restamped row from an untouched one: `now()` is the
--- transaction timestamp, so a row created in this same transaction would have
--- updated_at equal to created_at whether or not the trigger ran.
-insert into public.habits (id, user_id, name, monthly_goal, color, sort_order, created_at, updated_at)
-values
-  ('aaaaaaaa-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
-   'A read', 10, 'teal', 0, '2023-07-01T00:00:00Z', '2023-07-01T00:00:00Z'),
-  ('aaaaaaaa-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111',
-   'A run', 10, 'blue', 1, '2023-07-01T00:00:00Z', '2023-07-01T00:00:00Z'),
-  ('bbbbbbbb-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222',
-   'B read', 10, 'purple', 0, '2023-07-01T00:00:00Z', '2023-07-01T00:00:00Z');
+-- The habits and the check-ins are created as the user they belong to, with a
+-- session, and that is not a formality. `set_row_user_id` is a before insert
+-- trigger on both tables and it stamps `auth.uid()` over whatever was supplied,
+-- so a fixture inserted by the admin role with no session gets a null owner and
+-- the not-null constraint rejects the row. Impersonating the owner is the only
+-- way to land the same owner the app would have put there, and the policies then
+-- check that owner rather than being bypassed.
+--
+-- So these inserts do not carry `user_id` at all. The real client does not send
+-- it either; see the trigger in 0001_init.sql. Only `id` is pinned, so the
+-- assertions below can name the rows.
+--
+-- created_at is pinned to 2023 on the habits so the updated_at assertion later
+-- can tell a restamped row from an untouched one: `now()` is the transaction
+-- timestamp, so a row created in this same transaction would have updated_at
+-- equal to created_at whether or not the trigger ran. The before update trigger
+-- does not fire on an insert, so those two values survive.
 
-insert into public.checkins (habit_id, user_id, date)
+-- A's rows.
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aud":"authenticated"}',
+  true);
+
+insert into public.habits (id, name, monthly_goal, color, sort_order, created_at, updated_at)
 values
-  ('aaaaaaaa-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', '2023-07-04'),
-  ('aaaaaaaa-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', '2023-07-05'),
-  ('bbbbbbbb-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', '2023-07-04');
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'A read', 10, 'teal', 0, '2023-07-01T00:00:00Z', '2023-07-01T00:00:00Z'),
+  ('aaaaaaaa-0000-0000-0000-000000000002', 'A run', 10, 'blue', 1, '2023-07-01T00:00:00Z', '2023-07-01T00:00:00Z');
+
+insert into public.checkins (habit_id, date)
+values
+  ('aaaaaaaa-0000-0000-0000-000000000001', '2023-07-04'),
+  ('aaaaaaaa-0000-0000-0000-000000000002', '2023-07-05');
+
+-- B's rows, created the same way. The habit has to exist before the check-in on
+-- it, and both are created under B's session so the trigger stamps B.
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated","aud":"authenticated"}',
+  true);
+
+insert into public.habits (id, name, monthly_goal, color, sort_order, created_at, updated_at)
+values
+  ('bbbbbbbb-0000-0000-0000-000000000001', 'B read', 10, 'purple', 0, '2023-07-01T00:00:00Z', '2023-07-01T00:00:00Z');
+
+insert into public.checkins (habit_id, date)
+values
+  ('bbbbbbbb-0000-0000-0000-000000000001', '2023-07-04');
+
+-- Back to the session role. The assertions below set their own role and claims,
+-- and none of them create a row.
+reset role;
 
 -- Become user A.
 set local role authenticated;
@@ -400,9 +440,10 @@ select tests.truthy(
 -- and nothing changed
 -- ---------------------------------------------------------------------------
 
--- Reset to the session role, which owns these tables and bypasses row-level
--- security. As A these five would each read no row and count zero, which would
--- look like the same answer whether or not A's attempt had changed anything.
+-- Reset to the session role, which is the role that applied the migration and so
+-- bypasses row-level security. As A these five would each read no row and count
+-- zero, which would look like the same answer whether or not A's attempt had
+-- changed anything.
 reset role;
 
 select tests.same(
@@ -419,11 +460,13 @@ select tests.same(
   '1'
 );
 
+-- The expected day is cast to date and back to text as well, so both sides of the
+-- comparison are printed the same way whatever the database's DateStyle is.
 select tests.same(
   'B''s check-in still says the day it did',
   (select date from public.checkins
     where habit_id = 'bbbbbbbb-0000-0000-0000-000000000001')::text,
-  '2023-07-04'
+  '2023-07-04'::date::text
 );
 
 select tests.same(
