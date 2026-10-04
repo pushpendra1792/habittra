@@ -3,6 +3,11 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ToastProvider, ToastViewport } from '@/components/ui/Toast'
+import { AuthProvider } from '@/features/auth/AuthProvider'
+import { LoginScreen } from '@/features/auth/LoginScreen'
+import { ProtectedRoute } from '@/features/auth/ProtectedRoute'
+import { ResetPasswordScreen } from '@/features/auth/ResetPasswordScreen'
+import { SignupScreen } from '@/features/auth/SignupScreen'
 import { HomePage } from '@/pages/HomePage'
 
 // The design review page pulls in Recharts and every UI component. It is a
@@ -28,18 +33,44 @@ export default function App() {
       <ToastProvider>
         <ToastViewport />
 
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route
-            path="/design"
-            element={
-              <Suspense fallback={<RouteFallback />}>
-                <DesignPage />
-              </Suspense>
-            }
-          />
-          <Route path="*" element={<HomePage />} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <HomePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/login" element={<LoginScreen />} />
+            <Route path="/signup" element={<SignupScreen />} />
+            <Route path="/reset-password" element={<ResetPasswordScreen />} />
+
+            {/*
+              Left outside the gate on purpose. It is a review tool for the design
+              system, it touches no user data, and locking a designer out of it
+              would only make the next change harder to check.
+            */}
+            <Route
+              path="/design"
+              element={
+                <Suspense fallback={<RouteFallback />}>
+                  <DesignPage />
+                </Suspense>
+              }
+            />
+
+            <Route
+              path="*"
+              element={
+                <ProtectedRoute>
+                  <HomePage />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </AuthProvider>
       </ToastProvider>
     </BrowserRouter>
   )
