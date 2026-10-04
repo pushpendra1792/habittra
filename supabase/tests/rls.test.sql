@@ -5,31 +5,72 @@
 -- Everything else is TypeScript running against pure functions, which cannot tell
 -- you whether a policy is right.
 --
--- NOT RUN YET. It was written without a Supabase project to point at. Run it
--- before trusting the policies:
+-- ---------------------------------------------------------------------------
+-- Before you run this
+-- ---------------------------------------------------------------------------
+--
+-- Enable pgTAP once: in the dashboard, Database, Extensions, then pgTAP and
+-- Enable. Nothing here depends on any other project setting, and without that one
+-- extension every assertion below fails with `function plan(integer) does not
+-- exist`.
+--
+-- Against the hosted project, paste this whole file into SQL Editor, New query,
+-- and press Run. Against a local stack:
 --
 --   npx supabase start
 --   npx supabase test db supabase/tests/rls.test.sql
 --
--- Against the hosted project, enable pgTAP once and paste the file into the SQL
--- Editor:
+-- ---------------------------------------------------------------------------
+-- What a pass looks like
+-- ---------------------------------------------------------------------------
 --
---   create extension if not exists pgtap;
+-- The last query in the file is a report: one row per assertion, numbered, marked
+-- `ok` or `not ok`, with the description, and with the actual values on the rows
+-- that failed. The last of those rows is the count: `29 of 29 passed`. The SQL
+-- Editor shows the result of the final statement and nothing else, which is why
+-- the report is last.
 --
--- How it works. It creates two throwaway auth users, A and B, gives each one
--- habit, and then switches between them the way Supabase switches for a real
--- request: by setting the role and the JWT claims. Every assertion is one user
--- doing something to a row belonging to the other.
+-- The pgTAP summary from `finish()` is emitted just above it in the same
+-- response and says the same thing in TAP form.
+--
+-- ---------------------------------------------------------------------------
+-- How it works
+-- ---------------------------------------------------------------------------
+--
+-- It creates two throwaway auth users, A and B, gives each one a habit, and then
+-- switches between them the way Supabase switches for a real request: by setting
+-- the role and the JWT claims. Every assertion is one user doing something to a
+-- row belonging to the other.
 --
 -- Everything is in a transaction that is rolled back at the end, so it leaves
--- nothing behind. The dropping of the fixtures is belt and braces for the case
--- where someone runs this with autocommit on.
+-- nothing behind: no test users, no habits, no check-ins, and not even the
+-- `tests` schema, which is why the next run can be pasted in unchanged.
 --
--- Note on the shape of this file. A forbidden write raises, which would abort the
--- transaction, so each one goes through `rls_denied`, which catches
--- `insufficient_privilege` and nothing else. A typo in one of those statements
--- therefore fails the test rather than quietly counting as a rejection: an
--- unexpected SQLSTATE propagates out and stops the run.
+-- ---------------------------------------------------------------------------
+-- Assumptions, and what each helper is for
+-- ---------------------------------------------------------------------------
+--
+-- The statements run as the role they are written for, so they are refused by
+-- row-level security, not by a missing table privilege. That is why the file
+-- assumes Supabase's default grants on schema `public`: `anon` and
+-- `authenticated` can select and write the three tables. A project that has
+-- revoked those would fail loudly rather than quietly pass.
+--
+-- A refusal comes in two shapes and the helpers distinguish them:
+--
+--   * An INSERT whose row fails a `with check` raises `insufficient_privilege`.
+--   * An UPDATE or DELETE whose row fails `using` is not an error at all. The
+--     row is simply not visible, the statement matches nothing, and it reports
+--     zero rows affected. `tests.refused` counts that as a refusal too, because
+--     that is what a refusal looks like from the outside.
+--
+-- Anything else -- a typo, a missing column, a constraint firing on the fixture
+-- itself -- propagates out and stops the run rather than being counted as a
+-- rejection.
+--
+-- The five "nothing changed" assertions run with the role reset, because they
+-- read B's rows and A cannot see them. Reading B's habit as A returns no row at
+-- all, which would prove nothing about whether A's attempt changed it.
 
 begin;
 
@@ -37,25 +78,175 @@ begin;
 -- local stack. Both are searched, so this file runs either way.
 set local search_path = public, extensions;
 
-create schema if not exists tests;
-
+-- First, and before anything is created or dropped, so a missing extension is
+-- the only thing that can fail: it reports `function plan(integer) does not
+-- exist` and touches nothing. The count has to equal the number of assertions
+-- below.
 select plan(29);
+
+-- Safe to re-run. A run that was interrupted after the schema was created, or
+-- one left behind by an older version of this file, is cleared first. Cascade
+-- takes the old helpers with it, so there is nothing else to drop by hand.
+drop schema if exists tests cascade;
+
+create schema tests;
+
+-- ---------------------------------------------------------------------------
+-- reporting
+-- ---------------------------------------------------------------------------
+--
+-- Every assertion lands here, in order, whether it passed or failed. It is a
+-- temp table, so it exists only inside this transaction, and it is in `pg_temp`
+-- explicitly because the assertions below run as `authenticated` and `anon`
+-- rather than as the role that created it.
+create temporary table test_results (
+  num         bigint generated always as identity,
+  ok          boolean not null,
+  description text    not null,
+  detail      text
+);
+
+-- The one function that writes to the results table, and the only one that is
+-- security definer: the assertions run as `authenticated` or `anon`, and neither
+-- owns a temp table it did not create. Its body is one insert and one call to
+-- pgTAP's `ok()`, so there is nothing in it for a caller to aim at.
+--
+-- A failed comparison gets the values appended to the pgTAP description as
+-- well, which is how a failure explains itself under `supabase test db` where
+-- this table is not printed.
+create function tests.record(p_description text, p_passed boolean, p_detail text)
+returns text
+language plpgsql
+security definer
+set search_path = pg_catalog, public, extensions
+as $$
+begin
+  -- The detail is kept only for a failure, so the report has nothing to read
+  -- except on the rows that need explaining.
+  insert into pg_temp.test_results (ok, description, detail)
+  values (p_passed, p_description, case when p_passed then null else p_detail end);
+
+  return ok(
+    p_passed,
+    case
+      when p_passed or p_detail is null then p_description
+      else p_description || ' (' || p_detail || ')'
+    end
+  );
+end;
+$$;
+
+-- Compares two values as text and records the result. NULL is equal to NULL,
+-- which is what pgTAP's own `is()` does, and NULL against anything else fails
+-- rather than being quietly unknown.
+create function tests.same(description text, have text, want text)
+returns text
+language sql
+set search_path = pg_catalog, public, extensions
+as $$
+  select tests.record(
+    description,
+    have is not distinct from want,
+    'have ' || coalesce(have, 'null') || ', want ' || coalesce(want, 'null')
+  );
+$$;
+
+-- Records a statement that has already been decided, such as the result of one
+-- of the helpers below.
+create function tests.truthy(description text, passed boolean, detail text default null)
+returns text
+language sql
+set search_path = pg_catalog, public, extensions
+as $$
+  select tests.record(description, passed, detail);
+$$;
+
+-- ---------------------------------------------------------------------------
+-- running a statement as the caller
+-- ---------------------------------------------------------------------------
+--
+-- Both of these are security invoker on purpose: the point of each is to run the
+-- statement under whatever role the assertions have switched to, so the
+-- policies are what answers. Neither one can be reached as anyone but the
+-- caller, and this whole transaction is rolled back.
+--
+
+-- True when a write was refused. See the note at the top: an insert is refused
+-- by raising, an update or a delete by matching nothing. Anything other than
+-- `insufficient_privilege` or zero rows propagates.
+create function tests.refused(sql text)
+returns boolean
+language plpgsql
+as $$
+declare
+  affected integer;
+begin
+  execute sql;
+
+  get diagnostics affected = row_count;
+
+  return affected = 0;
+exception
+  when insufficient_privilege then
+    return true;
+end;
+$$;
+
+-- True when a statement ran without raising. This is pgTAP's `lives_ok` without
+-- its pgTAP bookkeeping: a statement that does not run at all shows up here as a
+-- failed assertion with its own description, which is what a `lives_ok` would
+-- have reported too.
+create function tests.lives(sql text)
+returns boolean
+language plpgsql
+as $$
+begin
+  execute sql;
+
+  return true;
+exception when others then
+  return false;
+end;
+$$;
 
 -- ---------------------------------------------------------------------------
 -- fixtures
 -- ---------------------------------------------------------------------------
 
--- Two users. The columns listed are the ones auth.users has no default for.
--- raw_app_meta_data claims the email provider, which is what a user created
--- through /signup looks like, and raw_user_meta_data is what the trigger below
--- turns into profiles.display_name.
-insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
+-- Belt and braces for a run that something other than this file left behind. The
+-- rollback at the end means this file cannot leave a mess of its own, but a
+-- connection that dropped mid-run can, and the unique index on auth.users.email
+-- would then refuse the two rows below. Scoped to the two ids here, and undone
+-- by the same rollback as everything else. The cascade takes their profiles,
+-- habits and check-ins with them.
+delete from auth.users where id in (
+  '11111111-1111-1111-1111-111111111111',
+  '22222222-2222-2222-2222-222222222222'
+);
+
+-- Two users. The columns listed are the ones a row created outside the auth
+-- server needs: raw_app_meta_data claims the email provider, which is what a user
+-- created through /signup looks like, and raw_user_meta_data is what the trigger
+-- below turns into profiles.display_name.
+--
+-- Both metadata columns are jsonb, so the display name is built with
+-- jsonb_build_object rather than by concatenating a string: `'{"a":"' || label ||
+-- '"}'` is a text expression and jsonb will not take it.
+--
+-- instance_id is left out. It is nullable, and it is a foreign key into
+-- auth.instances, so a made-up all-zero uuid would fail on the reference rather
+-- than on anything this file is testing. Nothing in the migration or in the
+-- policies reads it.
+insert into auth.users (id, aud, role, email, encrypted_password,
                         email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
                         created_at, updated_at)
-select '00000000-0000-0000-0000-000000000000', id, 'authenticated', 'authenticated',
+select id, 'authenticated', 'authenticated',
        email, 'not-a-real-hash', now(),
-       '{"provider":"email","providers":["email"]}',
-       '{"display_name":"' || label || '"}',
+       jsonb_build_object(
+         'provider', 'email',
+         'providers', jsonb_build_array('email')
+       ),
+       jsonb_build_object('display_name', label),
        now(), now()
 from (values
   ('11111111-1111-1111-1111-111111111111'::uuid, 'rls-a@example.test'::text, 'A'::text),
@@ -79,27 +270,10 @@ insert into public.checkins (habit_id, user_id, date)
 values
   ('aaaaaaaa-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', '2023-07-04'),
   ('aaaaaaaa-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', '2023-07-05'),
-  ('bbbbbbbb-0000-0000-0000-000000000001', '22222222-2222-2222-2222-2222-222222222222', '2023-07-04');
-
--- Runs a statement and reports whether it was refused by a policy. Only
--- `insufficient_privilege`, which is what PostgREST surfaces for a row the
--- policies exclude, counts as a refusal. Anything else propagates and fails.
-create function tests.rls_denied(sql text)
-returns boolean
-language plpgsql
-as $$
-begin
-  execute sql;
-
-  return false;
-exception
-  when insufficient_privilege then
-    return true;
-end;
-$$;
+  ('bbbbbbbb-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', '2023-07-04');
 
 -- Become user A.
-select set_config('role', 'authenticated', true);
+set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aud":"authenticated"}',
   true);
@@ -110,158 +284,167 @@ select set_config('request.jwt.claims',
 
 -- A row on auth.users must produce a profile, or every screen that shows a name
 -- shows nothing.
-select is(
+select tests.same(
+  'the signup trigger created a profile row',
   (select display_name from public.profiles
-    where id = '11111111-1111-1111-1111-111111111111'),
-  'A',
-  'the signup trigger created a profile row'
+    where id = '11111111-1111-1111-1111-111111111111')::text,
+  'A'
 );
 
-select is(
+select tests.same(
+  'a new profile defaults to the system theme',
   (select theme from public.profiles
-    where id = '11111111-1111-1111-1111-111111111111'),
-  'system',
-  'a new profile defaults to the system theme'
+    where id = '11111111-1111-1111-1111-111111111111')::text,
+  'system'
 );
 
 -- ---------------------------------------------------------------------------
 -- reads: A must not see B
 -- ---------------------------------------------------------------------------
 
-select is(
-  (select count(*) from public.habits),
-  2::bigint,
-  'A sees exactly A''s two habits'
+select tests.same(
+  'A sees exactly A''s two habits',
+  (select count(*) from public.habits)::text,
+  '2'
 );
 
-select is(
+select tests.same(
+  'A sees none of B''s habits',
   (select count(*) from public.habits
-    where user_id = '22222222-2222-2222-2222-222222222222'),
-  0::bigint,
-  'A sees none of B''s habits'
+    where user_id = '22222222-2222-2222-2222-222222222222')::text,
+  '0'
 );
 
-select is(
-  (select count(*) from public.checkins),
-  2::bigint,
-  'A sees exactly A''s two check-ins'
+select tests.same(
+  'A sees exactly A''s two check-ins',
+  (select count(*) from public.checkins)::text,
+  '2'
 );
 
-select is(
+select tests.same(
+  'A sees none of B''s check-ins',
   (select count(*) from public.checkins
-    where user_id = '22222222-2222-2222-2222-222222222222'),
-  0::bigint,
-  'A sees none of B''s check-ins'
+    where user_id = '22222222-2222-2222-2222-222222222222')::text,
+  '0'
 );
 
 -- Become user B.
-select set_config('role', 'authenticated', true);
+set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated","aud":"authenticated"}',
   true);
 
-select is(
-  (select count(*) from public.habits),
-  1::bigint,
-  'B sees exactly B''s one habit'
+select tests.same(
+  'B sees exactly B''s one habit',
+  (select count(*) from public.habits)::text,
+  '1'
 );
 
-select is(
-  (select count(*) from public.checkins),
-  1::bigint,
-  'B sees exactly B''s one check-in'
+select tests.same(
+  'B sees exactly B''s one check-in',
+  (select count(*) from public.checkins)::text,
+  '1'
 );
 
 -- Become user A again.
-select set_config('role', 'authenticated', true);
+set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aud":"authenticated"}',
   true);
 
 -- ---------------------------------------------------------------------------
--- writes across accounts: refused, and nothing changed
+-- writes across accounts
 -- ---------------------------------------------------------------------------
 
--- The important one. An update policy with no USING clause lets any signed-in
+-- Each of these is attempted by A against a row that belongs to B. The important
+-- one is the update: an update policy with no USING clause lets any signed-in
 -- user rewrite anybody's rows, and nothing about the app would look wrong.
-select is(
-  tests.rls_denied(
+select tests.truthy(
+  'A cannot update B''s habit',
+  tests.refused(
     $$update public.habits set name = 'A was here'
-      where id = 'bbbbbbbb-0000-0000-0000-000000000001'$$),
-  true,
-  'A cannot update B''s habit'
+      where id = 'bbbbbbbb-0000-0000-0000-000000000001'$$)
 );
 
-select is(
-  (select name from public.habits where id = 'bbbbbbbb-0000-0000-0000-000000000001'),
-  'B read',
-  'B''s habit is unchanged after A tried to update it'
+select tests.truthy(
+  'A cannot delete B''s habit',
+  tests.refused(
+    $$delete from public.habits where id = 'bbbbbbbb-0000-0000-0000-000000000001'$$)
 );
 
-select is(
-  tests.rls_denied(
-    $$delete from public.habits where id = 'bbbbbbbb-0000-0000-0000-000000000001'$$),
-  true,
-  'A cannot delete B''s habit'
-);
-
-select is(
-  (select count(*) from public.habits where id = 'bbbbbbbb-0000-0000-0000-000000000001'),
-  1::bigint,
-  'B''s habit still exists after A tried to delete it'
-);
-
-select is(
-  tests.rls_denied(
+select tests.truthy(
+  'A cannot update B''s check-in',
+  tests.refused(
     $$update public.checkins set date = '2023-07-20'
-      where habit_id = 'bbbbbbbb-0000-0000-0000-000000000001'$$),
-  true,
-  'A cannot update B''s check-in'
+      where habit_id = 'bbbbbbbb-0000-0000-0000-000000000001'$$)
 );
 
-select is(
-  (select date from public.checkins
-    where habit_id = 'bbbbbbbb-0000-0000-0000-000000000001'),
-  '2023-07-04'::date,
-  'B''s check-in still says the day it did'
-);
-
-select is(
-  tests.rls_denied(
+select tests.truthy(
+  'A cannot delete B''s check-in',
+  tests.refused(
     $$delete from public.checkins
-      where habit_id = 'bbbbbbbb-0000-0000-0000-000000000001'$$),
-  true,
-  'A cannot delete B''s check-in'
+      where habit_id = 'bbbbbbbb-0000-0000-0000-000000000001'$$)
 );
-
-select is(
-  (select count(*) from public.checkins
-    where habit_id = 'bbbbbbbb-0000-0000-0000-000000000001'),
-  1::bigint,
-  'B''s check-in still exists after A tried to delete it'
-);
-
--- ---------------------------------------------------------------------------
--- the habit ownership check on check-ins
--- ---------------------------------------------------------------------------
 
 -- The one a user_id comparison alone would not catch. If the check-ins policies
--- trusted the denormalised user_id without also confirming the habit, this insert
--- would succeed and attribute a check-in to a habit A cannot even see.
-select is(
-  tests.rls_denied(
+-- trusted the denormalised user_id without also confirming the habit, this
+-- insert would succeed and attribute a check-in to a habit A cannot even see.
+select tests.truthy(
+  'A cannot check in on B''s habit',
+  tests.refused(
     $$insert into public.checkins (habit_id, date)
-      values ('bbbbbbbb-0000-0000-0000-000000000001', '2023-07-06')$$),
-  true,
-  'A cannot check in on B''s habit'
+      values ('bbbbbbbb-0000-0000-0000-000000000001', '2023-07-06')$$)
 );
 
-select is(
-  (select count(*) from public.checkins
-    where habit_id = 'bbbbbbbb-0000-0000-0000-000000000001'),
-  1::bigint,
-  'B''s habit still has only the check-in it started with'
+-- ---------------------------------------------------------------------------
+-- and nothing changed
+-- ---------------------------------------------------------------------------
+
+-- Reset to the session role, which owns these tables and bypasses row-level
+-- security. As A these five would each read no row and count zero, which would
+-- look like the same answer whether or not A's attempt had changed anything.
+reset role;
+
+select tests.same(
+  'B''s habit is unchanged after A tried to update it',
+  (select name from public.habits
+    where id = 'bbbbbbbb-0000-0000-0000-000000000001')::text,
+  'B read'
 );
+
+select tests.same(
+  'B''s habit still exists after A tried to delete it',
+  (select count(*) from public.habits
+    where id = 'bbbbbbbb-0000-0000-0000-000000000001')::text,
+  '1'
+);
+
+select tests.same(
+  'B''s check-in still says the day it did',
+  (select date from public.checkins
+    where habit_id = 'bbbbbbbb-0000-0000-0000-000000000001')::text,
+  '2023-07-04'
+);
+
+select tests.same(
+  'B''s check-in still exists after A tried to delete it',
+  (select count(*) from public.checkins
+    where habit_id = 'bbbbbbbb-0000-0000-0000-000000000001')::text,
+  '1'
+);
+
+select tests.same(
+  'B''s habit still has only the check-in it started with',
+  (select count(*) from public.checkins
+    where habit_id = 'bbbbbbbb-0000-0000-0000-000000000001')::text,
+  '1'
+);
+
+-- Back to A for the rest.
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aud":"authenticated"}',
+  true);
 
 -- ---------------------------------------------------------------------------
 -- ownership cannot be forged
@@ -270,16 +453,17 @@ select is(
 -- A before insert trigger fills user_id from the session, so a client that sends
 -- somebody else's id gets its own id on the row. The insert being allowed is the
 -- point; the next assertion is what matters.
-select lives_ok(
-  $$insert into public.habits (user_id, name, monthly_goal, color)
-    values ('22222222-2222-2222-2222-222222222222', 'A forged', 5, 'coral')$$,
-  'A can send somebody else''s user_id on insert'
+select tests.truthy(
+  'A can send somebody else''s user_id on insert',
+  tests.lives(
+    $$insert into public.habits (user_id, name, monthly_goal, color)
+      values ('22222222-2222-2222-2222-222222222222', 'A forged', 5, 'coral')$$)
 );
 
-select is(
+select tests.same(
+  'the forged user_id was replaced with A''s own',
   (select user_id from public.habits where name = 'A forged')::text,
-  '11111111-1111-1111-1111-111111111111',
-  'the forged user_id was replaced with A''s own'
+  '11111111-1111-1111-1111-111111111111'
 );
 
 -- ---------------------------------------------------------------------------
@@ -288,37 +472,42 @@ select is(
 
 -- Every policy blocked outright would pass all of the assertions above. These are
 -- what stop this file being satisfied by an app where nothing works at all.
-select lives_ok(
-  $$insert into public.habits (name, monthly_goal, color, sort_order)
-    values ('A swim', 8, 'yellow', 2)$$,
-  'A can create a habit of their own'
+select tests.truthy(
+  'A can create a habit of their own',
+  tests.lives(
+    $$insert into public.habits (name, monthly_goal, color, sort_order)
+      values ('A swim', 8, 'yellow', 2)$$)
 );
 
-select lives_ok(
-  $$update public.habits set archived = true
-    where id = 'aaaaaaaa-0000-0000-0000-000000000001'$$,
-  'A can archive their own habit'
+select tests.truthy(
+  'A can archive their own habit',
+  tests.lives(
+    $$update public.habits set archived = true
+      where id = 'aaaaaaaa-0000-0000-0000-000000000001'$$)
 );
 
-select is(
-  (select updated_at > created_at from public.habits
-    where id = 'aaaaaaaa-0000-0000-0000-000000000001'),
-  true,
-  'the updated_at trigger restamped the archived habit'
+select tests.truthy(
+  'the updated_at trigger restamped the archived habit',
+  coalesce(
+    (select updated_at > created_at from public.habits
+      where id = 'aaaaaaaa-0000-0000-0000-000000000001'),
+    false
+  )
 );
 
-select lives_ok(
-  $$insert into public.checkins (habit_id, date)
-    values ('aaaaaaaa-0000-0000-0000-000000000002', '2023-07-06')$$,
-  'A can check in on their own habit'
+select tests.truthy(
+  'A can check in on their own habit',
+  tests.lives(
+    $$insert into public.checkins (habit_id, date)
+      values ('aaaaaaaa-0000-0000-0000-000000000002', '2023-07-06')$$)
 );
 
-select is(
+select tests.same(
+  'the check-in trigger stamped A as the owner',
   (select user_id from public.checkins
     where habit_id = 'aaaaaaaa-0000-0000-0000-000000000002'
       and date = '2023-07-06')::text,
-  '11111111-1111-1111-1111-111111111111',
-  'the check-in trigger stamped A as the owner'
+  '11111111-1111-1111-1111-111111111111'
 );
 
 -- ---------------------------------------------------------------------------
@@ -327,38 +516,80 @@ select is(
 
 -- auth.uid() is null without a session. If any policy were written as
 -- `user_id is not null` rather than `user_id = auth.uid()`, this would find rows.
-select set_config('role', 'anon', true);
+set local role anon;
 select set_config('request.jwt.claims', '{}', true);
 
-select is(
-  (select count(*) from public.habits),
-  0::bigint,
-  'a request with no session sees no habits'
+select tests.same(
+  'a request with no session sees no habits',
+  (select count(*) from public.habits)::text,
+  '0'
 );
 
-select is(
-  (select count(*) from public.checkins),
-  0::bigint,
-  'a request with no session sees no check-ins'
+select tests.same(
+  'a request with no session sees no check-ins',
+  (select count(*) from public.checkins)::text,
+  '0'
 );
 
-select is(
-  (select count(*) from public.profiles),
-  0::bigint,
-  'a request with no session sees no profiles'
+select tests.same(
+  'a request with no session sees no profiles',
+  (select count(*) from public.profiles)::text,
+  '0'
 );
 
-select is(
-  tests.rls_denied(
-    $$insert into public.habits (name, monthly_goal, color)
-      values ('anon habit', 3, 'teal')$$),
-  true,
-  'a request with no session cannot create a habit'
+-- An update rather than an insert, on purpose. With no session the before insert
+-- trigger writes a null owner, and whether that surfaces as a refusal by policy
+-- or as a not-null violation is a Postgres check-order detail this file should
+-- not be asserting. An update of a habit that exists is refused with no error at
+-- all, which is the property worth stating: nothing is writable without a
+-- session.
+select tests.truthy(
+  'a request with no session cannot change a habit',
+  tests.refused(
+    $$update public.habits set name = 'anon habit'
+      where id = 'aaaaaaaa-0000-0000-0000-000000000001'$$)
 );
+
+-- Back to the session role for pgTAP's own summary. It reads its bookkeeping out
+-- of temp tables it created, and there is no reason to ask `anon` for that.
+reset role;
 
 select * from finish();
 
-rollback;
+-- ---------------------------------------------------------------------------
+-- the report
+-- ---------------------------------------------------------------------------
+--
+-- The last query in the file, which is what the SQL Editor shows, since it shows
+-- one result grid. One row per assertion in the order they ran, then the count. A
+-- `not ok` row carries the values that disagreed in `detail`.
+select
+  num,
+  case when ok then 'ok' else 'not ok' end as result,
+  description,
+  detail
+from pg_temp.test_results
 
-drop function if exists tests.rls_denied(text);
-drop schema if exists tests cascade;
+union all
+
+select
+  null::bigint,
+  case
+    when count(*) = count(*) filter (where ok) then 'ok'
+    else 'not ok'
+  end,
+  format(
+    '%s of %s passed%s',
+    count(*) filter (where ok),
+    count(*),
+    case
+      when count(*) = count(*) filter (where ok) then ''
+      else ' - ' || (count(*) - count(*) filter (where ok)) || ' FAILED'
+    end
+  ),
+  null::text
+from pg_temp.test_results
+
+order by num nulls last;
+
+rollback;

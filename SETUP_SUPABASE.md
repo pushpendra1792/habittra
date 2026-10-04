@@ -202,7 +202,51 @@ Row-level security is the only thing between two accounts and each other's
 habits. `supabase/tests/rls.test.sql` checks that with pgTAP.
 
 It has **not been run against a project** as part of building this. Run it
-yourself before you trust it:
+yourself before you trust it.
+
+### Enable pgTAP first
+
+**Database → Extensions**, find **pgTAP**, enable it. Nothing else in the setup
+depends on it, and without it the test cannot run at all: every assertion fails
+with `function plan(integer) does not exist`.
+
+### Run it in the SQL Editor
+
+1. **SQL Editor → New query**.
+2. Open `supabase/tests/rls.test.sql` and paste the whole file in, header
+   comments and all. Do not run it in parts.
+3. **Run**.
+
+It takes a second or two, and the result is a table: one row per assertion, with
+a `result` column of `ok` or `not ok`, and a last row that is the count.
+
+| num | result | description                                     | detail |
+| --- | ------ | ----------------------------------------------- | ------ |
+| 1   | ok     | the signup trigger created a profile row        |        |
+| 2   | ok     | a new profile defaults to the system theme      |        |
+| 3   | ok     | A sees exactly A's two habits                   |        |
+| …   |        |                                                 |        |
+| 28  | ok     | a request with no session sees no profiles      |        |
+| 29  | ok     | a request with no session cannot change a habit |        |
+|     | ok     | 29 of 29 passed                                 |        |
+
+The bottom row is what you want: `29 of 29 passed`, marked `ok`. The `num` is
+blank on it because it is not an assertion.
+
+Anything else means a policy is wrong:
+
+- **`not ok` on a row** — the `detail` column says what disagreed. For example
+  `have 3, want 2` means a user can see a row that is not theirs.
+- **`not ok` on the summary row** — it reads `28 of 29 passed - 1 FAILED`, and the
+  `not ok` rows above it are the failures.
+- **An error instead of a table** — read the message. `function plan(integer)
+does not exist` means pgTAP is not enabled. Anything else names the statement
+  that failed.
+
+### Run it with the CLI instead
+
+Optional. The Supabase CLI is not a dependency of this repo; use it through
+`npx`, and note that this needs a local stack rather than the hosted project.
 
 ```bash
 npx supabase start                                   # local stack
@@ -210,15 +254,13 @@ npx supabase test db                                 # all files in supabase/tes
 npx supabase test db supabase/tests/rls.test.sql     # or just this one
 ```
 
-For the hosted project, paste the file into the SQL Editor instead. pgTAP has to
-be available first:
+### Running it twice, and what it leaves behind
 
-```sql
-create extension if not exists pgtap;
-```
-
-The file drops and recreates its own users, so it is safe to run against a project
-that has real data: everything it creates is removed by the `rollback` at the end.
+It is safe to run against a project that has real data. Everything it creates is
+inside a transaction that ends in `rollback`, so no test user, habit or
+check-in survives. The `tests` schema it creates its helpers in disappears with
+the same rollback, and the file drops any leftover copy of it before it starts,
+so a second run needs no cleanup in between.
 
 Until you have run it, treat the policies as unverified.
 
