@@ -37,12 +37,16 @@ interface ReorderContext {
 }
 
 export interface HabitMutations {
-  /** Adds a habit at the end of the list. */
-  add: (input: NewHabitInput) => void
-  /** Applies a patch to one habit: name, goal or colour. */
-  edit: (id: string, patch: HabitPatch) => void
-  /** Archives one habit. Its history stays. */
-  archive: (id: string) => void
+  /**
+   * Adds a habit at the end of the list. Resolves `true` once the write has
+   * landed and `false` when it failed, having already reported the failure, so
+   * a form can decide whether to close without parsing an error itself.
+   */
+  add: (input: NewHabitInput) => Promise<boolean>
+  /** Applies a patch to one habit: name, goal or colour. Same resolution rule. */
+  edit: (id: string, patch: HabitPatch) => Promise<boolean>
+  /** Archives one habit. Its history stays. Resolves as `add` does. */
+  archive: (id: string) => Promise<boolean>
   /** Brings an archived habit back, at the end of the list. */
   restore: (id: string) => void
   /** Moves the active habits into a new order. */
@@ -127,14 +131,31 @@ export function useHabitMutations(): HabitMutations {
   })
 
   return {
-    add: (input) => {
-      add.mutate({ ...input, sortOrder: nextSortOrder(cachedHabits()) })
+    add: async (input) => {
+      try {
+        await add.mutateAsync({ ...input, sortOrder: nextSortOrder(cachedHabits()) })
+        return true
+      } catch {
+        // onError has already said what went wrong; this is only the answer to
+        // "did it work", so the caller can close its form or keep the text.
+        return false
+      }
     },
-    edit: (id, patch) => {
-      edit.mutate({ id, patch })
+    edit: async (id, patch) => {
+      try {
+        await edit.mutateAsync({ id, patch })
+        return true
+      } catch {
+        return false
+      }
     },
-    archive: (id) => {
-      archive.mutate(id)
+    archive: async (id) => {
+      try {
+        await archive.mutateAsync(id)
+        return true
+      } catch {
+        return false
+      }
     },
     restore: (id) => {
       restore.mutate({ id, sortOrder: nextSortOrder(cachedHabits()) })
