@@ -255,27 +255,37 @@ describe('toHabitUpdate', () => {
 })
 
 describe('toCheckinInsert', () => {
-  it('sends the habit and the day, and nothing else', () => {
-    expect(toCheckinInsert('habit-row-1', '2023-07-04')).toEqual({
+  it('sends the id, the habit and the day, and nothing else', () => {
+    expect(toCheckinInsert('habit-row-1', '2023-07-04', 'checkin-new-1')).toEqual({
+      id: 'checkin-new-1',
       habit_id: 'habit-row-1',
       date: '2023-07-04',
     })
   })
 
   it('never sends a user_id, because the database fills it from the session', () => {
-    expect(Object.keys(toCheckinInsert('habit-row-1', '2023-07-04'))).not.toContain('user_id')
+    expect(Object.keys(toCheckinInsert('habit-row-1', '2023-07-04', 'checkin-new-1'))).not.toContain(
+      'user_id',
+    )
   })
 
   it('round trips through the row mapper without moving the day', () => {
-    const insert = toCheckinInsert('habit-row-1', '2023-01-01')
+    const insert = toCheckinInsert('habit-row-1', '2023-01-01', 'checkin-new-2')
     const checkin: Checkin = toCheckin(checkinRow(insert))
 
     expect(checkin.date).toBe('2023-01-01')
   })
 
+  it('keeps the caller-supplied id, so a replayed write is the same row', () => {
+    const insert = toCheckinInsert('habit-row-1', '2023-07-04', 'checkin-queued-1')
+
+    expect(toCheckin(checkinRow(insert)).id).toBe('checkin-queued-1')
+    expect(toCheckinInsert('habit-row-1', '2023-07-04', 'checkin-queued-1')).toEqual(insert)
+  })
+
   it('round trips the first and last day of a year', () => {
     for (const day of ['2023-01-01', '2023-12-31'] as const) {
-      expect(toCheckin(checkinRow(toCheckinInsert('h', day))).date).toBe(day)
+      expect(toCheckin(checkinRow(toCheckinInsert('h', day, 'checkin-year'))).date).toBe(day)
     }
   })
 })

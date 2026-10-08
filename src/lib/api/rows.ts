@@ -161,7 +161,12 @@ export function toHabitUpdate(patch: HabitPatch): HabitUpdateRow {
  * No `user_id` and no `date` conversion: the day is already the string the app
  * has been using all along, and it goes to a `date` column unchanged. Passing it
  * through `Date` first is exactly the round trip the date rules forbid.
+ *
+ * `id` is supplied by the caller rather than left to `gen_random_uuid()`, so a
+ * write queued while offline keeps one identity across every retry: the same
+ * request is recognisable as the same request instead of arriving as a second
+ * row with a second id.
  */
-export function toCheckinInsert(habitId: string, date: DateString): CheckinInsertRow {
-  return { habit_id: habitId, date }
+export function toCheckinInsert(habitId: string, date: DateString, id: string): CheckinInsertRow {
+  return { id, habit_id: habitId, date }
 }
