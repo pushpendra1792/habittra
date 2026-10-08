@@ -58,3 +58,29 @@ export function findFocusableCell(
 
   return null
 }
+
+/**
+ * Where focus starts: the first habit, on the day worth landing on.
+ *
+ * Today when today is in the month on screen, because that is where a user
+ * resumes. Otherwise the last day of a month that has been and gone, so the
+ * view opens on what happened rather than on a blank stretch at the left, and
+ * the first day of a month that has not started, which is the same thing seen
+ * from the other side. The dates are plain `YYYY-MM-DD` strings compared as
+ * strings, so nothing here goes near a timezone.
+ */
+export function defaultAnchor(dates: readonly string[], today: string): Cell {
+  const todayIndex = dates.indexOf(today)
+
+  if (todayIndex >= 0) {
+    return { row: 0, col: todayIndex }
+  }
+
+  const first = dates[0] ?? ''
+
+  if (first !== '' && today < first) {
+    return { row: 0, col: 0 }
+  }
+
+  return { row: 0, col: Math.max(0, dates.length - 1) }
+}

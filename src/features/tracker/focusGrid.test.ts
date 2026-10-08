@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { findFocusableCell } from './focusGrid'
+import { defaultAnchor, findFocusableCell } from './focusGrid'
 
 const allFocusable = () => true
 
@@ -63,5 +63,32 @@ describe('findFocusableCell', () => {
 
   it('gives up when the grid is empty', () => {
     expect(findFocusableCell({ row: 0, col: 0 }, 'right', 0, 0, allFocusable)).toBeNull()
+  })
+})
+
+describe('defaultAnchor', () => {
+  const october = Array.from(
+    { length: 31 },
+    (_, index) => `2026-10-${String(index + 1).padStart(2, '0')}`,
+  )
+
+  it('lands on today when today is in the month', () => {
+    expect(defaultAnchor(october, '2026-10-09')).toEqual({ row: 0, col: 8 })
+    expect(defaultAnchor(october, '2026-10-01')).toEqual({ row: 0, col: 0 })
+    expect(defaultAnchor(october, '2026-10-31')).toEqual({ row: 0, col: 30 })
+  })
+
+  it('lands on the last day of a month that has passed', () => {
+    expect(defaultAnchor(october, '2026-11-02')).toEqual({ row: 0, col: 30 })
+    expect(defaultAnchor(october, '2027-01-01')).toEqual({ row: 0, col: 30 })
+  })
+
+  it('lands on the first day of a month that has not started', () => {
+    expect(defaultAnchor(october, '2026-09-30')).toEqual({ row: 0, col: 0 })
+  })
+
+  it('answers for February and for an empty list', () => {
+    expect(defaultAnchor(['2024-02-01', '2024-02-29'], '2024-02-29')).toEqual({ row: 0, col: 1 })
+    expect(defaultAnchor([], '2026-10-09')).toEqual({ row: 0, col: 0 })
   })
 })
