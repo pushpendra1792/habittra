@@ -1,4 +1,5 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useState } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -28,50 +29,71 @@ function RouteFallback() {
 }
 
 export default function App() {
+  // One client for the session. Built lazily so a re-render never throws the
+  // cache away, which would refetch every month the moment anything changed.
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            // One retry: a dropped connection recovers on its own, and a real
+            // failure reaches the retry button in seconds rather than in a
+            // minute of backoff. Mutations keep the default of no retries,
+            // because a write that may have landed must not be sent again
+            // without the queue in Phase 6 deciding to.
+            retry: 1,
+            staleTime: 30_000,
+          },
+        },
+      }),
+  )
+
   return (
-    <BrowserRouter>
-      <ToastProvider>
-        <ToastViewport />
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <ToastProvider>
+          <ToastViewport />
 
-        <AuthProvider>
-          <Routes>
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <HomePage />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="/login" element={<LoginScreen />} />
-            <Route path="/signup" element={<SignupScreen />} />
-            <Route path="/reset-password" element={<ResetPasswordScreen />} />
+          <AuthProvider>
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <HomePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="/login" element={<LoginScreen />} />
+              <Route path="/signup" element={<SignupScreen />} />
+              <Route path="/reset-password" element={<ResetPasswordScreen />} />
 
-            {/*
-              Left outside the gate on purpose. It is a review tool for the design
-              system, it touches no user data, and locking a designer out of it
-              would only make the next change harder to check.
-            */}
-            <Route
-              path="/design"
-              element={
-                <Suspense fallback={<RouteFallback />}>
-                  <DesignPage />
-                </Suspense>
-              }
-            />
+              {/*
+                Left outside the gate on purpose. It is a review tool for the design
+                system, it touches no user data, and locking a designer out of it
+                would only make the next change harder to check.
+              */}
+              <Route
+                path="/design"
+                element={
+                  <Suspense fallback={<RouteFallback />}>
+                    <DesignPage />
+                  </Suspense>
+                }
+              />
 
-            <Route
-              path="*"
-              element={
-                <ProtectedRoute>
-                  <HomePage />
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
-        </AuthProvider>
-      </ToastProvider>
-    </BrowserRouter>
+              <Route
+                path="*"
+                element={
+                  <ProtectedRoute>
+                    <HomePage />
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </AuthProvider>
+        </ToastProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   )
 }

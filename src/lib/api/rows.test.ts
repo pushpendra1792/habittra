@@ -264,9 +264,9 @@ describe('toCheckinInsert', () => {
   })
 
   it('never sends a user_id, because the database fills it from the session', () => {
-    expect(Object.keys(toCheckinInsert('habit-row-1', '2023-07-04', 'checkin-new-1'))).not.toContain(
-      'user_id',
-    )
+    expect(
+      Object.keys(toCheckinInsert('habit-row-1', '2023-07-04', 'checkin-new-1')),
+    ).not.toContain('user_id')
   })
 
   it('round trips through the row mapper without moving the day', () => {
