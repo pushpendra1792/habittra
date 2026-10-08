@@ -21,8 +21,9 @@ import { ProgressBar } from '@/components/ui/ProgressBar'
 import { habitCompleted, habitProgressPct, type Totals } from '@/lib/stats'
 import type { Checkin, DateString, Habit, MonthKey } from '@/types'
 
+import { columnWash } from './columnWash'
 import { defaultAnchor, findFocusableCell, type Cell, type CellDirection } from './focusGrid'
-import { monthDays, type MonthDay } from './monthDays'
+import { monthDays } from './monthDays'
 
 /** Habit name and goal on the left, sticky while the days scroll. */
 const LEFT_CELL = 'w-38 shrink-0 md:w-50'
@@ -35,24 +36,6 @@ const ARROW_TO_DIRECTION: Record<string, CellDirection> = {
   ArrowDown: 'down',
   ArrowLeft: 'left',
   ArrowRight: 'right',
-}
-
-/**
- * The column wash. Today is tinted with the accent, the weekend with a little
- * shade of the ink colour; both are light enough that the cell outlines and the
- * checked fills still read on top of them, and neither is the only thing
- * carrying the information — today also has its ring and its own label.
- */
-function columnWash(day: MonthDay, today: DateString): string {
-  if (day.date === today) {
-    return 'bg-accent-teal/10'
-  }
-
-  if (day.weekend) {
-    return 'bg-text-on-light/5'
-  }
-
-  return ''
 }
 
 interface GridCell {
