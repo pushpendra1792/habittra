@@ -225,7 +225,7 @@ export function ProgressRings({
         tabIndex={0}
         onScroll={handleScroll}
         onKeyDown={handleKeyDown}
-        className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:pb-0"
+        className="relative flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:pb-0"
       >
         {rings.map((ring) => (
           <RingCard key={ring.id} {...ring} isFuture={isFuture} />

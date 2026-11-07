@@ -161,7 +161,7 @@ export default function DailyCompletionChart({
         role="img"
         aria-label={`${month} daily completions line chart`}
         aria-describedby={summaryId}
-        className="text-text-muted-on-dark"
+        className="tabular text-text-muted-on-dark"
         style={{ height: 220 }}
       >
         <ResponsiveContainer width="100%" height="100%">
