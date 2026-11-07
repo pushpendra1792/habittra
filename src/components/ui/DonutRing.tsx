@@ -20,6 +20,11 @@ export interface DonutRingProps {
   caption?: string
   /** Accessible name for the ring. */
   ariaLabel?: string
+  /**
+   * How long the first fill takes, in milliseconds. Later value changes keep
+   * the default 200ms so a check-in is a smooth update, not a second entrance.
+   */
+  enterDurationMs?: number
 }
 
 const trackColors: Record<RingTone, string> = {
@@ -45,9 +50,11 @@ export function DonutRing({
   label,
   caption,
   ariaLabel,
+  enterDurationMs,
 }: DonutRingProps) {
   const target = clampPercent(value)
   const [drawn, setDrawn] = useState(0)
+  const [entered, setEntered] = useState(enterDurationMs === undefined)
 
   useEffect(() => {
     // Next frame, so the browser has already painted the empty ring and the
@@ -60,6 +67,20 @@ export function DonutRing({
       cancelAnimationFrame(frame)
     }
   }, [target])
+
+  useEffect(() => {
+    if (enterDurationMs === undefined) {
+      return
+    }
+
+    const timer = setTimeout(() => {
+      setEntered(true)
+    }, enterDurationMs)
+
+    return () => {
+      clearTimeout(timer)
+    }
+  }, [enterDurationMs])
 
   const stroke = Math.max(6, Math.round(size * 0.09))
   const radius = (size - stroke) / 2
@@ -94,6 +115,11 @@ export function DonutRing({
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           className={`${ACCENT_STROKE_CLASS[color]} transition-[stroke-dashoffset] duration-200 ease-out`}
+          style={
+            entered || enterDurationMs === undefined
+              ? undefined
+              : { transitionDuration: `${enterDurationMs}ms` }
+          }
         />
       </svg>
 
