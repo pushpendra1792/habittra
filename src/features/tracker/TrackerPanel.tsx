@@ -18,6 +18,7 @@ import { useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEve
 import { Button } from '@/components/ui/Button'
 import { CheckCell } from '@/components/ui/CheckCell'
 import { ProgressBar } from '@/components/ui/ProgressBar'
+import { barHeightPct } from '@/features/dashboard/chartModel'
 import { habitCompleted, habitProgressPct, type Totals } from '@/lib/stats'
 import type { Checkin, DateString, Habit, MonthKey } from '@/types'
 
@@ -84,6 +85,10 @@ export interface TrackerPanelProps {
   today: DateString
   /** The month's totals, from `totals()` in the page. */
   monthTotals: Totals
+  /** One count per day from `dailyCounts()`; future days are null. */
+  dailyCounts: readonly (number | null)[]
+  /** Highest non-null day, used only to scale the bar strip. */
+  maxDailyCount: number
   /** Writes one cell. Optimistic, with rollback on failure. */
   onToggle: (habitId: string, date: DateString, next: boolean) => void
   onAddHabit: () => void
@@ -95,6 +100,8 @@ export function TrackerPanel({
   monthKey,
   today,
   monthTotals,
+  dailyCounts,
+  maxDailyCount,
   onToggle,
   onAddHabit,
 }: TrackerPanelProps) {
@@ -299,6 +306,56 @@ export function TrackerPanel({
               </div>
             )
           })}
+
+          <div className="flex h-14 items-stretch" role="group" aria-label="Daily check-in totals">
+            <div
+              data-sticky
+              className={`sticky left-0 z-10 flex items-center border-r border-border-light bg-card-light px-3 md:px-4 ${LEFT_CELL}`}
+            >
+              <span className="text-xs font-semibold uppercase tracking-wide text-text-on-light/55">
+                Daily
+              </span>
+            </div>
+
+            {days.map((day, index) => {
+              const count = dailyCounts[index] ?? null
+
+              if (count === null) {
+                return (
+                  <div
+                    key={day.date}
+                    aria-hidden="true"
+                    className={`${DAY_COLUMN} ${columnWash(day, today)}`}
+                  />
+                )
+              }
+
+              return (
+                <div
+                  key={day.date}
+                  role="img"
+                  aria-label={`${day.label}, ${count} check-ins`}
+                  className={`${DAY_COLUMN} flex flex-col items-center justify-end gap-0.5 pb-1 ${columnWash(day, today)}`}
+                >
+                  <div className="flex h-9 w-full items-end justify-center">
+                    <div
+                      aria-hidden="true"
+                      className="w-2/3 rounded-t-sm bg-accent-teal"
+                      style={{ height: `${barHeightPct(count, maxDailyCount)}%` }}
+                    />
+                  </div>
+                  <span
+                    aria-hidden="true"
+                    className="tabular text-[10px] font-medium leading-none text-text-on-light/60"
+                  >
+                    {count}
+                  </span>
+                </div>
+              )
+            })}
+
+            <div data-sticky="right" className={RIGHT_CELL} />
+          </div>
         </div>
       </div>
 

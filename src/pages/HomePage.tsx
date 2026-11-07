@@ -15,15 +15,13 @@ import { AppHeader } from '@/components/layout/AppHeader'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { useMonthStats } from '@/features/dashboard/useMonthStats'
 import { HabitManagerModal } from '@/features/habits/HabitManagerModal'
 import { activeHabits } from '@/features/habits/habitList'
 import { MonthSwitcher } from '@/features/tracker/MonthSwitcher'
 import { TrackerPanel } from '@/features/tracker/TrackerPanel'
 import { currentMonthKey, parseMonthParam } from '@/features/tracker/monthParam'
-import { useCheckins, useHabits } from '@/features/tracker/trackerQueries'
 import { useToggleCheckin } from '@/features/tracker/useToggleCheckin'
-import { todayString } from '@/lib/dates'
-import { totals } from '@/lib/stats'
 
 /** The grid's shape while it loads: a header band and four habit rows. */
 function TrackerSkeleton() {
@@ -68,10 +66,18 @@ function PanelError({ onRetry }: { onRetry: () => void }) {
 export function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const monthKey = parseMonthParam(searchParams.get('m'), currentMonthKey())
-  const today = todayString()
 
-  const habitsQuery = useHabits()
-  const checkinsQuery = useCheckins(monthKey)
+  const {
+    habits,
+    checkins,
+    today,
+    totals: monthTotals,
+    dailyCounts,
+    maxDailyCount,
+    isPending,
+    isError,
+    retry,
+  } = useMonthStats(monthKey)
   const { toggle } = useToggleCheckin(monthKey)
 
   // Kept after closing so the dialog's title does not change underneath the
@@ -79,32 +85,12 @@ export function HomePage() {
   const [managerView, setManagerView] = useState<'list' | 'add'>('list')
   const [managerOpen, setManagerOpen] = useState(false)
 
-  const habits = habitsQuery.data
-  const checkins = checkinsQuery.data
-
-  const active = useMemo(() => (habits === undefined ? [] : activeHabits(habits)), [habits])
-  const monthTotals = useMemo(
-    () => totals(habits ?? [], checkins ?? [], monthKey),
-    [habits, checkins, monthKey],
-  )
+  const active = useMemo(() => activeHabits(habits), [habits])
 
   const openManager = (view: 'list' | 'add') => {
     setManagerView(view)
     setManagerOpen(true)
   }
-
-  const retry = () => {
-    if (habitsQuery.isError) {
-      void habitsQuery.refetch()
-    }
-
-    if (checkinsQuery.isError) {
-      void checkinsQuery.refetch()
-    }
-  }
-
-  const isLoading = habitsQuery.isPending || checkinsQuery.isPending
-  const isError = habitsQuery.isError || checkinsQuery.isError
 
   return (
     <div className="flex min-h-full flex-col">
@@ -135,7 +121,7 @@ export function HomePage() {
         </div>
 
         <Card tone="light" flush>
-          {isLoading ? (
+          {isPending ? (
             <TrackerSkeleton />
           ) : isError ? (
             <PanelError onRetry={retry} />
@@ -143,10 +129,12 @@ export function HomePage() {
             <TrackerPanel
               key={monthKey}
               habits={active}
-              checkins={checkins ?? []}
+              checkins={checkins}
               monthKey={monthKey}
               today={today}
               monthTotals={monthTotals}
+              dailyCounts={dailyCounts}
+              maxDailyCount={maxDailyCount}
               onToggle={toggle}
               onAddHabit={() => {
                 openManager('add')
@@ -159,7 +147,7 @@ export function HomePage() {
       <HabitManagerModal
         open={managerOpen}
         initialView={managerView}
-        habits={habits ?? []}
+        habits={habits}
         onClose={() => {
           setManagerOpen(false)
         }}
