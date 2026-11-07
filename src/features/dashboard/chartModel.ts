@@ -22,10 +22,7 @@ export interface DailyPoint {
  * `startDay` is the day number of the first entry, which is not always 1: the
  * mobile chart shows a window near the end of the month.
  */
-export function dailyPoints(
-  counts: readonly (number | null)[],
-  startDay = 1,
-): DailyPoint[] {
+export function dailyPoints(counts: readonly (number | null)[], startDay = 1): DailyPoint[] {
   const highest = maxDailyCount(counts)
   const maxIndex = highest > 0 ? counts.findIndex((count) => count === highest) : -1
 

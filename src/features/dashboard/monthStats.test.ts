@@ -2,12 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { checkinsOn, makeHabit } from '@/test/factories'
 import type { DateString, MonthKey } from '@/types'
-import {
-  barHeightPct,
-  dailyPoints,
-  formatOneDecimal,
-  recentCountWindow,
-} from './chartModel'
+import { barHeightPct, dailyPoints, formatOneDecimal, recentCountWindow } from './chartModel'
 import { mapMonthStats } from './monthStats'
 
 const JULY = '2023-07' as MonthKey

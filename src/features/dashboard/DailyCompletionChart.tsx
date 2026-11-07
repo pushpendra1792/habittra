@@ -178,7 +178,11 @@ export default function DailyCompletionChart({
               </filter>
             </defs>
 
-            <CartesianGrid stroke="currentColor" className="text-text-on-dark/10" vertical={false} />
+            <CartesianGrid
+              stroke="currentColor"
+              className="text-text-on-dark/10"
+              vertical={false}
+            />
 
             <XAxis
               dataKey="day"

@@ -90,7 +90,11 @@ function RingCard({ title, value, color, note, isFuture }: RingCardProps) {
       </div>
 
       {note !== undefined ? (
-        <p id={noteId} hidden={!noteOpen} className="text-xs leading-relaxed text-text-muted-on-dark">
+        <p
+          id={noteId}
+          hidden={!noteOpen}
+          className="text-xs leading-relaxed text-text-muted-on-dark"
+        >
           {note}
         </p>
       ) : null}
@@ -213,11 +217,7 @@ export function ProgressRings({
   }
 
   return (
-    <section
-      className={className}
-      aria-label="Progress rings"
-      aria-roledescription="carousel"
-    >
+    <section className={className} aria-label="Progress rings" aria-roledescription="carousel">
       <div
         ref={scrollRef}
         role="group"
