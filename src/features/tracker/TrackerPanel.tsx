@@ -27,8 +27,13 @@ import { monthDays } from './monthDays'
 
 /** Habit name and goal on the left, sticky while the days scroll. */
 const LEFT_CELL = 'w-38 shrink-0 md:w-50'
-/** Per-habit progress on the right, wide screens only. */
-const RIGHT_CELL = 'ml-auto hidden w-35 shrink-0 items-center px-4 md:flex'
+/**
+ * Per-habit progress on the right, sticky so it stays on screen while the days
+ * scroll. It appears at 768px; below that the small percent by the habit name is
+ * the only progress shown.
+ */
+const RIGHT_CELL =
+  'sticky right-0 z-10 hidden w-20 shrink-0 items-center border-l border-border-light bg-card-light px-2 md:flex lg:w-24 xl:w-28 xl:px-3'
 const DAY_COLUMN = 'w-9 shrink-0'
 
 const ARROW_TO_DIRECTION: Record<string, CellDirection> = {
@@ -224,7 +229,7 @@ export function TrackerPanel({
               </div>
             ))}
 
-            <div className={RIGHT_CELL} />
+            <div data-sticky="right" className={RIGHT_CELL} />
           </div>
 
           {habits.map((habit, row) => {
@@ -279,7 +284,13 @@ export function TrackerPanel({
                 })}
 
                 <div role="group" aria-label={`${habit.name} progress`} className={RIGHT_CELL}>
-                  <ProgressBar value={pct} color={habit.color} showValue tone="light" />
+                  <ProgressBar
+                    value={pct}
+                    color={habit.color}
+                    showValue
+                    tone="light"
+                    className="w-full"
+                  />
                 </div>
               </div>
             )
