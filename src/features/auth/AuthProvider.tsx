@@ -30,6 +30,7 @@ import {
   passwordRecoveryRedirectUrl,
   signInRedirectUrl,
 } from '@/features/auth/redirects'
+import { logAuthError } from '@/lib/api/errors'
 import { getSupabaseClient, SupabaseConfigError } from '@/lib/supabase'
 
 export interface AuthProviderProps {
@@ -151,6 +152,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       })
 
       if (error !== null) {
+        logAuthError('sign up', error)
         throw error
       }
     },
@@ -165,6 +167,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       })
 
       if (error !== null) {
+        logAuthError('sign in', error)
         throw error
       }
     },
@@ -193,6 +196,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       })
 
       if (error !== null) {
+        logAuthError('password reset', error)
         throw error
       }
     },

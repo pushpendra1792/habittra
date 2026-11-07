@@ -106,6 +106,28 @@ const DATABASE_CODES: Readonly<Record<string, string>> = {
 }
 
 /**
+ * Logs the raw auth failure fields in development.
+ *
+ * The screens keep showing the short, mapped copy from `authErrorMessage`. This
+ * is the other half: the message, status and code Supabase actually sent, which
+ * is what makes a failed auth call diagnosable. Passwords and tokens are never
+ * part of a thrown auth error, and only these three fields are read, so nothing
+ * sensitive reaches the console.
+ */
+export function logAuthError(context: string, error: unknown): void {
+  if (!import.meta.env.DEV) {
+    return
+  }
+
+  const fields = fieldsOf(error)
+  const message = typeof fields['message'] === 'string' ? fields['message'] : 'Unknown auth error'
+  const status = typeof fields['status'] === 'number' ? fields['status'] : undefined
+  const code = typeof fields['code'] === 'string' ? fields['code'] : undefined
+
+  console.error(`[auth] ${context} failed`, { message, status, code })
+}
+
+/**
  * Copy for a failed auth call.
  *
  * `fallback` is what the screen wants to say when it recognises nothing better,

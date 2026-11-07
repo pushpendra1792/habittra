@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { authErrorMessage, databaseErrorMessage, isCheckinAlreadyRecorded } from '@/lib/api/errors'
+import {
+  authErrorMessage,
+  databaseErrorMessage,
+  isCheckinAlreadyRecorded,
+  logAuthError,
+} from '@/lib/api/errors'
 import { CHECKINS_HABIT_DATE_CONSTRAINT } from '@/lib/api/constraints'
 
 /** The shape GoTrue and PostgREST both put errors in. */
@@ -253,5 +258,54 @@ describe('isCheckinAlreadyRecorded', () => {
     for (const value of [undefined, null, 'string', {}]) {
       expect(isCheckinAlreadyRecorded(value)).toBe(false)
     }
+  })
+})
+
+describe('logAuthError', () => {
+  it('logs only the raw message, status and code in development', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    logAuthError('sign in', {
+      message: 'Invalid login credentials',
+      status: 400,
+      code: 'invalid_credentials',
+      password: 'correct horse',
+      access_token: 'secret-token',
+    })
+
+    expect(spy).toHaveBeenCalledWith('[auth] sign in failed', {
+      message: 'Invalid login credentials',
+      status: 400,
+      code: 'invalid_credentials',
+    })
+
+    const logged = JSON.stringify(spy.mock.calls)
+
+    expect(logged).not.toContain('correct horse')
+    expect(logged).not.toContain('secret-token')
+  })
+
+  it('stays quiet outside development', () => {
+    vi.stubEnv('DEV', false)
+
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    logAuthError('sign in', error('Invalid login credentials'))
+
+    expect(spy).not.toHaveBeenCalled()
+
+    vi.unstubAllEnvs()
+  })
+
+  it('has something to say when the error carries no message', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    logAuthError('sign up', undefined)
+
+    expect(spy).toHaveBeenCalledWith('[auth] sign up failed', {
+      message: 'Unknown auth error',
+      status: undefined,
+      code: undefined,
+    })
   })
 })
