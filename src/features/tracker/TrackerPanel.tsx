@@ -26,15 +26,19 @@ import { defaultAnchor, findFocusableCell, type Cell, type CellDirection } from 
 import { monthDays } from './monthDays'
 
 /** Habit name and goal on the left, sticky while the days scroll. */
-const LEFT_CELL = 'w-38 shrink-0 md:w-50'
+const LEFT_CELL = 'w-38 shrink-0 md:w-50 lg:w-32 xl:w-40'
 /**
  * Per-habit progress on the right, sticky so it stays on screen while the days
  * scroll. It appears at 768px; below that the small percent by the habit name is
  * the only progress shown.
  */
 const RIGHT_CELL =
-  'sticky right-0 z-10 hidden w-20 shrink-0 items-center border-l border-border-light bg-card-light px-2 md:flex lg:w-24 xl:w-28 xl:px-3'
-const DAY_COLUMN = 'w-9 shrink-0'
+  'sticky right-0 z-10 hidden w-20 shrink-0 items-center border-l border-border-light bg-card-light px-2 md:flex lg:w-20 xl:w-24 xl:px-3'
+/**
+ * Fixed 36px cells while the grid scrolls below 1024px. From 1024px the day
+ * columns share the row, with a 24px floor so 31 days fit on a 1024px screen.
+ */
+const DAY_COLUMN = 'w-9 shrink-0 lg:w-auto lg:min-w-6 lg:flex-1'
 
 const ARROW_TO_DIRECTION: Record<string, CellDirection> = {
   ArrowUp: 'up',
@@ -202,7 +206,7 @@ export function TrackerPanel({
         onFocus={handleFocus}
         onKeyDown={handleKeyDown}
       >
-        <div className="w-max min-w-full">
+        <div className="w-max min-w-full lg:w-full">
           <div className="flex h-12 items-stretch border-b border-border-light">
             <div
               data-sticky
@@ -269,7 +273,7 @@ export function TrackerPanel({
                       <CheckCell
                         checked={isChecked}
                         color={habit.color}
-                        size={36}
+                        size="fill"
                         tone="light"
                         today={day.date === today}
                         disabled={day.date > today}

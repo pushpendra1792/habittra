@@ -14,8 +14,8 @@ export interface CheckCellProps extends Omit<
   color?: AccentName
   /** Draws the subtle ring marking today. */
   today?: boolean
-  /** Side length in px. */
-  size?: number
+  /** Side length in px, or "fill" to use the cell width up to 36px. */
+  size?: number | 'fill'
   /**
    * Surface the grid sits on. The habit grid lives on the light panel, where a
    * pale dotted outline would be invisible, so the empty state has to know.
@@ -92,14 +92,19 @@ export function CheckCell({
 
   const todayRing = today && !disabled ? todayRings[tone] : ''
 
+  // "fill" lets a narrow day column decide the size. The width cap keeps a cell
+  // from growing past the 36px it is elsewhere in the app.
+  const fillClasses = size === 'fill' ? 'aspect-square h-auto w-full max-w-9' : ''
+  const sizeStyle = size === 'fill' ? undefined : { width: size, height: size }
+
   return (
     <button
       type={type}
       aria-label={label}
       aria-pressed={checked}
       disabled={disabled}
-      className={`${base} ${state} ${todayRing} ${className}`}
-      style={{ width: size, height: size }}
+      className={`${base} ${fillClasses} ${state} ${todayRing} ${className}`}
+      style={sizeStyle}
       {...rest}
     >
       {checked ? (
