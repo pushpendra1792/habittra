@@ -16,7 +16,7 @@ function day(overrides: Partial<MonthDay>): MonthDay {
 
 describe('columnWash', () => {
   it('tints today with the accent', () => {
-    expect(columnWash(day({ date: '2026-10-09' }), '2026-10-09')).toBe('bg-accent-teal/10')
+    expect(columnWash(day({ date: '2026-10-09' }), '2026-10-09')).toBe('bg-accent-teal/8')
   })
 
   it('shades a weekend day that is not today', () => {
@@ -33,7 +33,7 @@ describe('columnWash', () => {
   it('lets today win when today is also a weekend day', () => {
     const sunday = day({ date: '2026-10-11', weekend: true, weekday: 'S' })
 
-    expect(columnWash(sunday, '2026-10-11')).toBe('bg-accent-teal/10')
+    expect(columnWash(sunday, '2026-10-11')).toBe('bg-accent-teal/8')
   })
 
   it('still shades the weekend of a month that is not the current one', () => {

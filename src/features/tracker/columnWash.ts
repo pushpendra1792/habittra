@@ -14,7 +14,7 @@ import type { DateString } from '@/types'
 /** An empty string means no wash: the cell keeps the panel's own colour. */
 export function columnWash(day: MonthDay, today: DateString): string {
   if (day.date === today) {
-    return 'bg-accent-teal/10'
+    return 'bg-accent-teal/8'
   }
 
   if (day.weekend) {

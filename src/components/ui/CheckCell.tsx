@@ -56,8 +56,8 @@ const emptyState: Record<CheckCellTone, string> = {
 }
 
 const todayRings: Record<CheckCellTone, string> = {
-  dark: 'ring-2 ring-text-on-dark/25 ring-offset-2 ring-offset-bg-surface',
-  light: 'ring-2 ring-text-on-light/25 ring-offset-2 ring-offset-card-light',
+  dark: 'ring-2 ring-accent-teal/40 ring-offset-2 ring-offset-bg-surface',
+  light: 'ring-2 ring-accent-teal/60 ring-offset-2 ring-offset-card-light',
 }
 
 /**
