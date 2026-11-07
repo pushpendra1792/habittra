@@ -1,46 +1,39 @@
 # Habittra progress
 
-Status as of 2026-11-07. There is no phase plan document in the repo, so the
-statuses below are inferred from the commit history and the files present.
+Status as of 2026-11-07.
 
-Last code commit: `5f60e06` (`5f60e065bb566d5196971b21f4ea1851d74bae6c`) —
-`refactor: move the day column wash out of the tracker panel`.
-
-Working tree at the time of writing: seven modified files, all uncommitted. They
-contain the Phase 4 layout and screenshot work described below.
+Last code commit: `59343f8` — `feat: log raw auth errors in development`.
+The `PROGRESS.md`/README update is committed after it.
 
 ## Phase status
 
 | Phase | Status | Evidence |
 | --- | --- | --- |
-| 0 Setup | Partly done | Vite + React 18 + TypeScript (strict), ESLint/Prettier, Vitest/Playwright configs, `@/` path alias, PWA manifest and service worker, README/AGENTS/`.env.example`. Missing: Capacitor config and Android project (`README.md` says "Nothing is generated yet"), and CI workflows (`.github/` is absent). |
-| 1 Design system | Done | UI primitives in `src/components/ui`, theme tokens in `src/styles/globals.css`, the `/design` review page, unit tests for the interactive primitives, and committed screenshots. Caveat: screenshot regeneration is currently Windows-incompatible. |
-| 2 Stats logic | Done | `src/lib/stats.ts` (totals, percentages, momentum, success rate, current/longest streaks), `src/lib/dates.ts`, and pure-function tests. `npm test` passes 21 files / 435 tests. |
-| 3 Supabase and auth | Partly done | Schema and RLS in `supabase/migrations/0001_init.sql`, RLS pgTAP script, typed client, API layer, auth provider/screens, auth E2E specs, and the setup doc. Gaps: `src/lib/database.types.ts` is still hand-written rather than generated from the project; raw auth errors are not logged in development; the RLS suite was not run here. |
-| 4 Tracker screen | Partly done | Month grid, habit manager, month switcher, query/mutation hooks, cache rules, and upsert check-ins. Of the four requested fixes, (c) and the screenshot half of (d) are applied in the working tree; (a), (b), and the environment half of (d) are not. The changes are uncommitted. |
+| 0 Setup | Done | Vite + React 18 + TypeScript (strict), ESLint/Prettier, Vitest/Playwright, `@/` alias, PWA manifest and service worker, README/AGENTS/`.env.example`. Capacitor belongs to Phase 8 and CI to Phase 10, not Phase 0. |
+| 1 Design system | Done | UI primitives in `src/components/ui`, theme tokens in `src/styles/globals.css`, the `/design` review page, component tests, and committed review screenshots. |
+| 2 Stats logic | Done | `src/lib/stats.ts` (totals, percentages, momentum, success rate, current/longest streaks), `src/lib/dates.ts`, and pure-function tests. The full suite passes 21 files / 438 tests. |
+| 3 Supabase and auth | Done | Schema and RLS in `supabase/migrations/0001_init.sql`, typed client, API layer, auth provider/screens, auth E2E, and the setup doc. The owner ran `supabase/tests/rls.test.sql` in the Supabase SQL Editor and all 29 assertions passed; that result cannot be seen from the repo. |
+| 4 Tracker screen | Done | Month grid, habit manager, month switcher, query/mutation hooks, cache rules, and upsert check-ins. Progress is visible from 768px, 31 days fit from 1024px, today has a teal ring, E2E is environment-independent, and raw auth errors are logged in development. Verified by the commands below. |
 
-## Phase 4 fix checklist
+## Phase 4 fixes
 
-- (a) Progress bar and percent on every row at 768px and wider: **No**. The
-  right cell is `hidden ... lg:flex` (1024px and up), and the percent in the
-  left cell is `md:hidden` (hidden from 768px). Between 768px and 1023px neither
-  is visible.
-- (b) All 31 days fit without horizontal scroll at 1024px and wider: **No**.
-  Day columns are at least 36px (`w-9` plus a 36px `CheckCell`): 31 × 36 =
-  1116px, plus 160px left cell and 96px right cell = 1372px at `lg`, and more at
-  `xl`. The grid therefore still scrolls at 1024px and 1280px.
-- (c) Today's cell uses a teal ring: **Yes** (working tree). `todayRings` uses
-  `ring-accent-teal/40` on dark and `ring-accent-teal/60` on light.
-- (d) Screenshot test no longer rewrites committed PNGs: **Yes** (working tree).
-  Writing is gated on `E2E_SCREENSHOTS=true`; the committed PNGs were unchanged
-  after a run.
-- (d) `test:e2e` does not depend on `.env.local`: **No**. The attempted override
-  sets `VITE_SUPABASE_URL=mock-url`, which Supabase rejects with
-  `Invalid supabaseUrl: Must be a valid HTTP or HTTPS URL`, crashing the app.
-  The full suite failed 48 of 54 tests. The override command is also Windows-only
-  (`cmd.exe /c set ...`), so it would fail on Linux CI. Separately, a build with
-  real keys fails `auth.spec.ts:75`, which expects the "not set up" message, so
-  the suite still depends on the environment.
+- Progress column: the sticky right column appears at 768px and shows the bar and
+  percent on every row. Below 768px the small percent by the habit name is shown
+  instead, so there is no width where neither appears.
+- Day columns: below 1024px they stay 36px wide and the grid scrolls with the
+  left column sticky. From 1024px they share the row with a 24px floor. At
+  1024px the content width is about 976px and the row needs 128px + 80px +
+  31 × 24px = 952px, so the month fits. This is width arithmetic, not an image
+  check.
+- Today's cell: `CheckCell` uses `ring-accent-teal/40` on dark and
+  `ring-accent-teal/60` on light.
+- E2E: `npm run test:e2e` builds with blank Supabase keys and blank optional
+  flags through the Playwright web server env, so `.env.local` cannot change the
+  result. Screenshot capture moved to `playwright.screenshots.config.ts` and
+  `npm run screenshots`; normal E2E never writes PNGs.
+- Auth logging: `logAuthError` prints the raw message, status and code in
+  development for sign up, sign in and password reset. User-facing copy is
+  unchanged, and only those three safe fields are logged.
 
 ## Verification (2026-11-07)
 
@@ -48,40 +41,29 @@ contain the Phase 4 layout and screenshot work described below.
 | --- | --- |
 | `npm run lint` | Pass |
 | `npm run typecheck` | Pass |
-| `npm test` | Pass — 21 files, 435 tests. Two expected `useToast` error stack traces are printed by `Toast.test.tsx`. |
-| `npm run build` | Pass — warning: main bundle is 662.72 kB, over the 500 kB warning limit. |
-| `npm run test:e2e` | **Fail** — 6 passed, 48 failed. Root cause: the invalid `mock-url` in `playwright.config.ts` crashes the app. Served from a valid build instead, `app.spec.ts` passes 3/3 and `auth.spec.ts` passes 14/15; the remaining failure is the "no keys" test because the local build has keys. |
+| `npm test` | Pass — 21 files, 438 tests. Two expected `useToast` stack traces are printed by `Toast.test.tsx`; they are stderr noise, not failures. |
+| `npm run build` | Pass — warning: main bundle is 662.69 kB, over the 500 kB warning limit. |
+| `npm run test:e2e` | Pass — 51 tests across 360px, 768px and 1280px in 56.5s. |
+| `npm run screenshots -- --list` | Lists 3 screenshot tests. Screenshot capture is deliberately not part of `test:e2e`. |
 
 ## Known issues
 
-1. Seven modified files are uncommitted in the working tree.
-2. `test:e2e` is broken by the `mock-url` override and is Windows-only. It needs
-   a portable way to build with blank keys (to match `auth.spec.ts`) and a
-   separate explicit opt-in for runs against real keys.
-3. Phase 4 (a): no progress bar or percent between 768px and 1023px.
-4. Phase 4 (b): the 31-day grid scrolls horizontally at 1024px and 1280px.
-5. `src/lib/database.types.ts` is hand-written to match the migration, not
-   generated from the real project, despite the header and `SETUP_SUPABASE.md`.
-6. Raw auth errors are not logged in development; only the user-facing mapping
-   in `src/lib/api/errors.ts` runs.
-7. `README.md` still says "Status: scaffolding only. No features are built yet."
-8. PWA icons are placeholders generated by
+1. `src/lib/database.types.ts` is still hand-written to match the migration, not
+   generated from the real project.
+2. Not built yet: Capacitor/Android (Phase 8) and CI (Phase 10).
+3. The main JS chunk is 662.69 kB; the build warns about the 500 kB limit.
+4. The tracker screen has no E2E coverage because `/` is behind the auth gate;
+   its pure helpers are unit-tested. The responsive width fit is checked by
+   arithmetic rather than an automated layout test.
+5. The committed design screenshots are from 2026-10-02. `npm run screenshots`
+   refreshes them, but it is a separate opt-in run.
+6. PWA icons are placeholders generated by
    `scripts/generate-placeholder-icons.mjs`; the README says to replace them and
    delete the script.
-9. No Capacitor config/Android project and no CI workflows.
-10. The main JS chunk is 662.72 kB; the build warns about the 500 kB limit.
-11. The tracker screen has no E2E coverage because `/` is behind the auth gate;
-    only its pure helpers are unit-tested.
-12. The committed design screenshots are from 2026-10-02; no successful
-    screenshot refresh is recorded since then.
-13. `npm run screenshots` uses POSIX inline env syntax
-    (`E2E_SCREENSHOTS=true ...`), which does not work under `cmd.exe` on Windows.
-14. The RLS pgTAP suite (`supabase/tests/rls.test.sql`) was not run for this
-    report; it needs a Supabase project or local stack.
+7. `npm test` prints two expected `useToast` error stack traces from
+   `Toast.test.tsx`.
 
 ## Next step
 
-Repair `test:e2e` first: build portably with blank keys so the suite is
-self-contained, and keep screenshots behind an explicit opt-in. Then finish the
-Phase 4 layout fixes — show progress and percent from 768px and make 31 days fit
-at 1024px and wider — verify at 360/768/1280, and commit the Phase 4 changes.
+Phase 4 is complete. Phase 5 has not been started; wait for the go-ahead before
+starting it.

@@ -3,7 +3,8 @@
 A habit tracker that runs as a website and as an Android app from one codebase,
 synced through a backend.
 
-Status: scaffolding only. No features are built yet.
+Status: Supabase auth and the monthly habit tracker are built. Android packaging
+and CI are not.
 
 ## Stack
 
@@ -53,9 +54,15 @@ The dev server runs at http://localhost:5173.
 | `npm run test:watch`       | Vitest in watch mode                       |
 | `npm run test:e2e`         | Playwright e2e at 360px, 768px and 1280px  |
 | `npm run test:e2e:install` | Download the Playwright browsers (one-off) |
+| `npm run screenshots`      | Write the design review screenshots        |
 
-`npm run test:e2e` builds the app itself and then serves `dist/`, so it works from
-a clean checkout. The first run needs browsers: `npm run test:e2e:install`.
+`npm run test:e2e` builds with blank Supabase keys and then serves `dist/`, so it
+gives the same result whether or not `.env.local` exists. It works from a clean
+checkout. The first run needs browsers: `npm run test:e2e:install`.
+
+Screenshots are a separate run so a normal test run never rewrites committed
+files. `npm run screenshots` builds the review page and writes the three files in
+`docs/screenshots/`.
 
 ## Project layout
 
