@@ -9,6 +9,7 @@
  * readable with `databaseErrorMessage` from ./errors, so the wording lives at the
  * screen where it is shown and this file stays about data.
  */
+import type { TablesInsert } from '@/lib/database.types'
 import { getSupabaseClient } from '@/lib/supabase'
 import type { Habit } from '@/types'
 
@@ -56,9 +57,14 @@ export async function listHabits(): Promise<Habit[]> {
  * forgotten here and end up relying on the client to send the right id.
  */
 export async function createHabit(habit: NewHabit): Promise<Habit> {
+  const insert = toHabitInsert(habit)
+
   const { data, error } = await getSupabaseClient()
     .from('habits')
-    .insert(toHabitInsert(habit))
+    // `set_row_user_id` supplies user_id from auth.uid() on insert, so the
+    // payload correctly omits it. The generated Insert type still requires the
+    // column; this is the one narrow cast at the client boundary.
+    .insert(insert as TablesInsert<'habits'>)
     .select()
     .single()
 

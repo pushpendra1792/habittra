@@ -8,6 +8,7 @@
  *
  * Nothing in this file touches Supabase. It takes values and returns values.
  */
+import { ACCENT_NAMES } from '@/lib/accents'
 import type { Tables, TablesInsert, TablesUpdate } from '@/lib/database.types'
 import type { Checkin, DateString, Habit, HabitColor } from '@/types'
 
@@ -15,9 +16,21 @@ export type HabitRow = Tables<'habits'>
 export type CheckinRow = Tables<'checkins'>
 export type ProfileRow = Tables<'profiles'>
 
-export type HabitInsertRow = TablesInsert<'habits'>
+/**
+ * The insert rows the API builds. `user_id` is deliberately absent: the
+ * `set_row_user_id` trigger stamps it from `auth.uid()`.
+ */
+export type HabitInsertRow = Omit<TablesInsert<'habits'>, 'user_id'>
 export type HabitUpdateRow = TablesUpdate<'habits'>
-export type CheckinInsertRow = TablesInsert<'checkins'>
+export type CheckinInsertRow = Omit<TablesInsert<'checkins'>, 'user_id'>
+
+/** A colour this build can render, used when a row carries an unknown value. */
+const FALLBACK_HABIT_COLOR: HabitColor = 'teal'
+
+/** Narrows a database `color` value to one of the five accents. */
+export function isHabitColor(value: string): value is HabitColor {
+  return ACCENT_NAMES.some((color) => color === value)
+}
 
 /** A habit as the app describes it. camelCase, and no fields the UI never reads. */
 export interface NewHabit {
@@ -66,7 +79,10 @@ export function toHabit(row: HabitRow): Habit {
     userId: row.user_id,
     name: row.name,
     monthlyGoal: row.monthly_goal,
-    color: row.color,
+    // A hand-edited row or an older schema can carry a colour this build does
+    // not know. Falling back keeps the UI renderable instead of casting an
+    // unknown string into the five-colour type.
+    color: isHabitColor(row.color) ? row.color : FALLBACK_HABIT_COLOR,
     sortOrder: row.sort_order,
     archived: row.archived,
     createdAt: row.created_at,

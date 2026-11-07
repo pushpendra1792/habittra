@@ -29,6 +29,9 @@ blob-report
 *.keystore
 service-role*.json
 
+# Supabase CLI local state
+supabase/.temp
+
 # Android / Capacitor
 android
 ios

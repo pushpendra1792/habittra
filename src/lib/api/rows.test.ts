@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  isHabitColor,
   toAppDate,
   toCheckin,
   toCheckinInsert,
@@ -76,6 +77,20 @@ describe('toAppDate', () => {
   })
 })
 
+describe('isHabitColor', () => {
+  it('accepts each of the five accent names', () => {
+    for (const color of ['teal', 'blue', 'purple', 'yellow', 'coral'] as const) {
+      expect(isHabitColor(color)).toBe(true)
+    }
+  })
+
+  it('rejects an unknown, empty or differently cased value', () => {
+    expect(isHabitColor('chartreuse')).toBe(false)
+    expect(isHabitColor('')).toBe(false)
+    expect(isHabitColor('TEAL')).toBe(false)
+  })
+})
+
 describe('toHabit', () => {
   it('maps every column to its camelCase field', () => {
     expect(toHabit(habitRow())).toEqual({
@@ -110,6 +125,10 @@ describe('toHabit', () => {
     for (const color of ['teal', 'blue', 'purple', 'yellow', 'coral'] as const) {
       expect(toHabit(habitRow({ color })).color).toBe(color)
     }
+  })
+
+  it('falls back to teal when the row has an unknown colour', () => {
+    expect(toHabit(habitRow({ color: 'chartreuse' })).color).toBe('teal')
   })
 
   it('maps a negative sort order, which is a legitimate tiebreaker value', () => {

@@ -9,6 +9,7 @@
  * of Greenwich in the evening. See the date rules in AGENTS.md.
  */
 import { addMonths } from '@/lib/dates'
+import type { TablesInsert } from '@/lib/database.types'
 import { getSupabaseClient } from '@/lib/supabase'
 import type { Checkin, DateString, MonthKey } from '@/types'
 
@@ -62,9 +63,14 @@ export async function listCheckinsForMonth(monthKey: MonthKey): Promise<Checkin[
  * user as a failure. Anything else that goes wrong still throws.
  */
 export async function checkIn(habitId: string, date: DateString, id: string): Promise<void> {
+  const insert = toCheckinInsert(habitId, date, id)
+
   const { error } = await getSupabaseClient()
     .from('checkins')
-    .upsert(toCheckinInsert(habitId, date, id), {
+    // `set_row_user_id` supplies user_id from auth.uid() on insert, so the
+    // payload correctly omits it. The generated Insert type still requires the
+    // column; this is the one narrow cast at the client boundary.
+    .upsert(insert as TablesInsert<'checkins'>, {
       onConflict: 'habit_id,date',
       // ON CONFLICT DO NOTHING: the repeat changes nothing at all, so the row a
       // first request wrote keeps its id and its created_at.

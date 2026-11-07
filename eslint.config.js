@@ -15,6 +15,7 @@ export default tseslint.config(
       'node_modules',
       'test-results',
       'playwright-report',
+      'src/lib/database.types.ts',
     ],
   },
   js.configs.recommended,
