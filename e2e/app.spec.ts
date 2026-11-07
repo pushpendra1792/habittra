@@ -51,28 +51,3 @@ test('modal traps focus and closes on Escape', async ({ page }) => {
   await expect(dialog).toBeHidden()
 })
 
-// The device profiles for mobile and tablet carry a deviceScaleFactor above 1,
-// which would emit a 945px wide file for the 360px project. Review screenshots
-// are pinned to 1:1 CSS pixels so the file matches the width it is named for.
-test.describe('design review screenshots', () => {
-  test.use({ deviceScaleFactor: 1 })
-
-  test('captures a full-page design review screenshot', async ({ page }, testInfo) => {
-    await page.goto('/design')
-
-    await expect(page.getByRole('heading', { level: 1, name: 'Habittra' })).toBeVisible()
-
-    // The trend chart measures its container and animates the line in, so wait
-    // for the finished path rather than screenshotting an empty or half-drawn
-    // frame.
-    await page.locator('.recharts-line-curve').first().waitFor({ state: 'visible' })
-    await page.evaluate(() => document.fonts.ready)
-
-    const path = `docs/screenshots/design-${testInfo.project.name}.png`
-
-    await page.screenshot({ path, fullPage: true, animations: 'disabled' })
-
-    // Recorded so the run output names the files it wrote.
-    await testInfo.attach(`design-${testInfo.project.name}`, { path })
-  })
-})
