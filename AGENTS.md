@@ -118,3 +118,5 @@ npm run build
 ```
 
 Then report what you changed, what you verified, and what you did not.
+
+Update `PROGRESS.md` at the end of every phase.
