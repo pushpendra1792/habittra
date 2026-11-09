@@ -3,8 +3,8 @@
 A habit tracker that runs as a website and as an Android app from one codebase,
 synced through a backend.
 
-Status: Supabase auth and the monthly habit tracker are built. Android packaging
-and CI are not.
+Status: Supabase auth, the monthly habit tracker and the dashboard are built.
+Android packaging and CI are not.
 
 ## Stack
 
