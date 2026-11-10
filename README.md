@@ -3,8 +3,8 @@
 A habit tracker that runs as a website and as an Android app from one codebase,
 synced through a backend.
 
-Status: Supabase auth, the monthly habit tracker and the dashboard are built.
-Android packaging and CI are not.
+Status: Supabase auth, the monthly habit tracker, the dashboard, and the offline
+cache and sync queue are built. Android packaging and CI are not.
 
 ## Stack
 
@@ -76,6 +76,7 @@ src/
     habits/        Habit definitions and CRUD
     tracker/       Daily check-ins
     dashboard/     Charts and summaries
+    sync/          Offline queue, cache hydration and header state
     settings/      User settings
   hooks/           Shared React hooks
   lib/             Framework-agnostic helpers and clients
@@ -114,6 +115,14 @@ node scripts/generate-placeholder-icons.mjs
 
 Replace them with real artwork, keeping the same filenames and the maskable
 safe zone, then delete the script.
+
+## Offline
+
+The tracker paints from an IndexedDB cache before Supabase answers, and writes
+that cannot reach the server are queued and replayed when the connection
+returns. See `SYNC.md` for what is cached, how conflicts are resolved and what
+signing out clears. The service worker is disabled in dev, so test an offline
+reload against `npm run build && npm run preview`, not `npm run dev`.
 
 ## Dates
 
