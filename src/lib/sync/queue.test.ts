@@ -182,6 +182,7 @@ describe('classifySyncError', () => {
   it('pauses on auth failures', () => {
     expect(classifySyncError({ status: 401, message: 'JWT expired' })).toBe('auth')
     expect(classifySyncError({ code: 'PGRST301', message: 'JWT expired' })).toBe('auth')
+    expect(classifySyncError({ status: 403, message: 'Forbidden' })).toBe('auth')
   })
 
   it('fails rule violations and missing parents', () => {

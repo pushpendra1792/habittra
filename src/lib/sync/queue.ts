@@ -136,6 +136,9 @@ export function classifySyncError(error: unknown): SyncErrorKind {
 
   if (
     status === 401 ||
+    // A plain 403 is an auth failure; `42501` is the RLS rule violation that
+    // belongs in the permanent list instead.
+    (status === 403 && code !== '42501') ||
     code === 'PGRST301' ||
     code === 'PGRST302' ||
     message.includes('jwt expired') ||
