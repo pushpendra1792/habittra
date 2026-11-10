@@ -1,6 +1,7 @@
 import { QueryClient } from '@tanstack/react-query'
 import { describe, expect, it } from 'vitest'
 
+import type { SyncOperation } from '@/lib/sync/types'
 import { makeCheckin } from '@/test/factories'
 import type { Checkin, MonthKey } from '@/types'
 
@@ -20,13 +21,20 @@ function variables(overrides: Partial<ToggleCheckinVars> = {}): ToggleCheckinVar
   }
 }
 
+interface HarnessInput {
+  isOnline?: boolean
+  write?: (variables: ToggleCheckinVars) => Promise<void>
+}
+
 interface Harness {
   queryClient: QueryClient
   rollbacks: unknown[]
+  queued: SyncOperation[]
+  writes: ToggleCheckinVars[]
   options: ReturnType<typeof toggleCheckinMutation>
 }
 
-function harness(seed: Checkin[] | undefined): Harness {
+function harness(seed: Checkin[] | undefined, input: HarnessInput = {}): Harness {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
@@ -36,6 +44,15 @@ function harness(seed: Checkin[] | undefined): Harness {
   }
 
   const rollbacks: unknown[] = []
+  const queued: SyncOperation[] = []
+  const writes: ToggleCheckinVars[] = []
+  const write =
+    input.write ??
+    ((variables: ToggleCheckinVars) => {
+      writes.push(variables)
+      return Promise.resolve()
+    })
+
   const options = toggleCheckinMutation({
     monthKey: MONTH,
     userId: 'user-test',
@@ -43,9 +60,19 @@ function harness(seed: Checkin[] | undefined): Harness {
     onRollback: (error) => {
       rollbacks.push(error)
     },
+    enqueue: (operation) => {
+      queued.push(operation)
+      return Promise.resolve()
+    },
+    isOnline: () => input.isOnline ?? true,
+    write,
   })
 
-  return { queryClient, rollbacks, options }
+  return { queryClient, rollbacks, queued, writes, options }
+}
+
+function operationError(message: string, fields: Record<string, unknown>): Error {
+  return Object.assign(new Error(message), fields)
 }
 
 describe('the optimistic check-in update', () => {
@@ -159,5 +186,67 @@ describe('settling', () => {
     options.onSettled(undefined, undefined, variables(), undefined)
 
     expect(queryClient.getQueryState(KEY)?.isInvalidated).toBe(true)
+  })
+})
+
+describe('the write path', () => {
+  it('sends normally when online and does not queue anything', async () => {
+    const { queued, writes, options } = harness([])
+
+    await options.mutationFn(variables())
+
+    expect(writes).toHaveLength(1)
+    expect(queued).toEqual([])
+  })
+
+  it('queues the same tap while offline without attempting the network', async () => {
+    const { queued, writes, options } = harness([], { isOnline: false })
+
+    await options.mutationFn(variables({ id: 'checkin-offline' }))
+
+    expect(writes).toEqual([])
+    expect(queued).toHaveLength(1)
+    expect(queued[0]).toMatchObject({
+      kind: 'add_checkin',
+      habitId: 'habit-1',
+      date: '2023-07-04',
+      checkinId: 'checkin-offline',
+      retryCount: 0,
+    })
+  })
+
+  it('queues a network failure instead of rolling back', async () => {
+    const error = new TypeError('Failed to fetch')
+    const { queued, rollbacks, options } = harness([], {
+      write: () => Promise.reject(error),
+    })
+
+    await expect(options.mutationFn(variables())).resolves.toBeUndefined()
+
+    expect(queued).toHaveLength(1)
+    expect(rollbacks).toEqual([])
+  })
+
+  it('queues a cleared day as a remove operation', async () => {
+    const { queued, options } = harness([], { isOnline: false })
+
+    await options.mutationFn(variables({ next: false }))
+
+    expect(queued[0]).toMatchObject({
+      kind: 'remove_checkin',
+      habitId: 'habit-1',
+      date: '2023-07-04',
+    })
+  })
+
+  it('rethrows a permanent failure and leaves the queue empty', async () => {
+    const error = operationError('check constraint violated', { code: '23514' })
+    const { queued, options } = harness([], {
+      write: () => Promise.reject(error),
+    })
+
+    await expect(options.mutationFn(variables())).rejects.toBe(error)
+
+    expect(queued).toEqual([])
   })
 })

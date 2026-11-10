@@ -4,22 +4,23 @@
  * The order of operations is the whole design. `onMutate` runs before the
  * write, so the cell changes on the first frame rather than on the round trip.
  * It first cancels any refetch in flight and remembers the list it is about to
- * change; if the write then fails, `onError` puts that list straight back and
- * the user sees the cell return to where it was, with a toast saying why.
- * `onSettled` refetches from the server either way, because the server is the
- * only thing that knows what actually happened.
+ * change; if the write then fails permanently, `onError` puts that list straight
+ * back and the user sees the cell return to where it was, with a toast saying
+ * why. A network or auth failure is handed to the offline queue instead, so the
+ * tap survives and the optimistic cell stays exactly where the user put it.
  *
  * The write itself carries a client-generated id and is an upsert on
  * `(habit_id, date)`, so the same tap replayed later is the same row and cannot
- * produce a duplicate. That is what Phase 6's offline queue will lean on.
- *
- * Components call `useToggleCheckin().toggle`. Nothing here touches Supabase
- * except through `@/lib/api`.
+ * produce a duplicate.
  */
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
 
+import { useSync } from '@/features/sync/useSync'
 import { databaseErrorMessage } from '@/lib/api/errors'
 import { checkIn, undoCheckin } from '@/lib/api/checkinsApi'
+import { checkinOperation } from '@/lib/sync/queue'
+import type { SyncOperation } from '@/lib/sync/types'
+import { writeOrQueue } from '@/lib/sync/write'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/useToast'
 import type { Checkin, DateString, MonthKey } from '@/types'
@@ -46,8 +47,12 @@ export interface ToggleCheckinOptions {
   /** Fills in `userId` on an optimistically added row. */
   userId: string
   queryClient: QueryClient
-  /** Called once per failure, after the cache has been rolled back. */
+  /** Called once per permanent failure, after the cache has been rolled back. */
   onRollback: (error: unknown) => void
+  enqueue: (operation: SyncOperation) => Promise<void>
+  isOnline: () => boolean
+  /** Injected in tests; the app uses the real API. */
+  write?: (variables: ToggleCheckinVars) => Promise<void>
 }
 
 export interface ToggleCheckinMutation {
@@ -66,6 +71,12 @@ export interface ToggleCheckinMutation {
   ) => void
 }
 
+function sendCheckin(variables: ToggleCheckinVars): Promise<void> {
+  return variables.next
+    ? checkIn(variables.habitId, variables.date, variables.id)
+    : undoCheckin(variables.habitId, variables.date)
+}
+
 /**
  * The mutation's four handlers, built from their dependencies and returned so
  * they can be exercised directly in a test with a real `QueryClient` and no
@@ -76,16 +87,28 @@ export function toggleCheckinMutation({
   userId,
   queryClient,
   onRollback,
+  enqueue,
+  isOnline,
+  write = sendCheckin,
 }: ToggleCheckinOptions): ToggleCheckinMutation {
   const key = checkinsKey(monthKey)
 
   return {
     mutationFn: async (variables) => {
-      if (variables.next) {
-        await checkIn(variables.habitId, variables.date, variables.id)
-      } else {
-        await undoCheckin(variables.habitId, variables.date)
-      }
+      const operation = checkinOperation(variables.next ? 'add' : 'remove', {
+        id: crypto.randomUUID(),
+        userId,
+        habitId: variables.habitId,
+        date: variables.date,
+        checkinId: variables.id,
+        createdAt: new Date().toISOString(),
+      })
+
+      await writeOrQueue({
+        write: () => write(variables),
+        enqueue: () => enqueue(operation),
+        isOnline,
+      })
     },
 
     onMutate: async (variables) => {
@@ -134,6 +157,7 @@ export function useToggleCheckin(monthKey: MonthKey): {
   toggle: (habitId: string, date: DateString, next: boolean) => void
 } {
   const { userId } = useAuth()
+  const { enqueue } = useSync()
   const { push } = useToast()
   const queryClient = useQueryClient()
 
@@ -142,6 +166,8 @@ export function useToggleCheckin(monthKey: MonthKey): {
       monthKey,
       userId: userId ?? '',
       queryClient,
+      enqueue,
+      isOnline: () => navigator.onLine,
       onRollback: (error) => {
         push({ message: databaseErrorMessage(error, 'Could not save that check-in.') })
       },
