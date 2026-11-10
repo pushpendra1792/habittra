@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/Button'
 import { Logo } from '@/components/ui/Logo'
+import { SyncIndicator } from '@/features/sync/SyncIndicator'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/useToast'
 import { authErrorMessage } from '@/lib/api/errors'
@@ -18,17 +19,21 @@ export function AppHeader() {
     <header className="flex items-center justify-between gap-4 border-b border-border-dark px-4 py-2.5 sm:px-6">
       <Logo size="sm" />
 
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => {
-          void signOut().catch((error: unknown) => {
-            push({ message: authErrorMessage(error, 'Could not sign you out.') })
-          })
-        }}
-      >
-        Sign out
-      </Button>
+      <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+        <SyncIndicator />
+
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            void signOut().catch((error: unknown) => {
+              push({ message: authErrorMessage(error, 'Could not sign you out.') })
+            })
+          }}
+        >
+          Sign out
+        </Button>
+      </div>
     </header>
   )
 }
