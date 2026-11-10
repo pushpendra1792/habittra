@@ -34,6 +34,8 @@ export function isHabitColor(value: string): value is HabitColor {
 
 /** A habit as the app describes it. camelCase, and no fields the UI never reads. */
 export interface NewHabit {
+  /** Client-generated id, so an offline create can be replayed safely. */
+  id?: string
   name: string
   monthlyGoal: number
   color: HabitColor
@@ -129,6 +131,10 @@ export function toHabitInsert(habit: NewHabit): HabitInsertRow {
     name: habit.name.trim(),
     monthly_goal: habit.monthlyGoal,
     color: habit.color,
+  }
+
+  if (habit.id !== undefined) {
+    row.id = habit.id
   }
 
   if (habit.sortOrder !== undefined) {

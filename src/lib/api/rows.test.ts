@@ -220,6 +220,22 @@ describe('toHabitInsert', () => {
     })
   })
 
+  it('keeps a client-generated id so an offline create can be replayed', () => {
+    expect(
+      toHabitInsert({
+        id: 'habit-client-1',
+        name: 'Read',
+        monthlyGoal: 12,
+        color: 'teal',
+      }),
+    ).toEqual({
+      id: 'habit-client-1',
+      name: 'Read',
+      monthly_goal: 12,
+      color: 'teal',
+    })
+  })
+
   it('produces a row that maps back to a habit', () => {
     const row = toHabitInsert({ name: 'Read', monthlyGoal: 12, color: 'purple', sortOrder: 2 })
     const habit = toHabit(habitRow(row))

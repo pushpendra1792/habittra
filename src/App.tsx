@@ -9,6 +9,7 @@ import { LoginScreen } from '@/features/auth/LoginScreen'
 import { ProtectedRoute } from '@/features/auth/ProtectedRoute'
 import { ResetPasswordScreen } from '@/features/auth/ResetPasswordScreen'
 import { SignupScreen } from '@/features/auth/SignupScreen'
+import { SyncProvider } from '@/features/sync/SyncProvider'
 import { LocalCacheProvider } from '@/features/tracker/LocalCacheProvider'
 import { HomePage } from '@/pages/HomePage'
 
@@ -57,42 +58,44 @@ export default function App() {
 
           <AuthProvider>
             <LocalCacheProvider>
-              <Routes>
-                <Route
-                  path="/"
-                  element={
-                    <ProtectedRoute>
-                      <HomePage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route path="/login" element={<LoginScreen />} />
-                <Route path="/signup" element={<SignupScreen />} />
-                <Route path="/reset-password" element={<ResetPasswordScreen />} />
+              <SyncProvider>
+                <Routes>
+                  <Route
+                    path="/"
+                    element={
+                      <ProtectedRoute>
+                        <HomePage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route path="/login" element={<LoginScreen />} />
+                  <Route path="/signup" element={<SignupScreen />} />
+                  <Route path="/reset-password" element={<ResetPasswordScreen />} />
 
-                {/*
-                  Left outside the gate on purpose. It is a review tool for the design
-                  system, it touches no user data, and locking a designer out of it
-                  would only make the next change harder to check.
-                */}
-                <Route
-                  path="/design"
-                  element={
-                    <Suspense fallback={<RouteFallback />}>
-                      <DesignPage />
-                    </Suspense>
-                  }
-                />
+                  {/*
+                    Left outside the gate on purpose. It is a review tool for the design
+                    system, it touches no user data, and locking a designer out of it
+                    would only make the next change harder to check.
+                  */}
+                  <Route
+                    path="/design"
+                    element={
+                      <Suspense fallback={<RouteFallback />}>
+                        <DesignPage />
+                      </Suspense>
+                    }
+                  />
 
-                <Route
-                  path="*"
-                  element={
-                    <ProtectedRoute>
-                      <HomePage />
-                    </ProtectedRoute>
-                  }
-                />
-              </Routes>
+                  <Route
+                    path="*"
+                    element={
+                      <ProtectedRoute>
+                        <HomePage />
+                      </ProtectedRoute>
+                    }
+                  />
+                </Routes>
+              </SyncProvider>
             </LocalCacheProvider>
           </AuthProvider>
         </ToastProvider>

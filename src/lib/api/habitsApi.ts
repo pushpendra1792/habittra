@@ -55,6 +55,11 @@ export async function listHabits(): Promise<Habit[]> {
  * No `user_id` is sent: a trigger on the table fills it from the session. RLS
  * rejects the insert if that trigger is missing, so the ownership rule cannot be
  * forgotten here and end up relying on the client to send the right id.
+ *
+ * The id is client-generated when the caller has one (the queue and optimistic
+ * create always do), and the write is an upsert on that id. A create that landed
+ * but whose response was lost is therefore safe to replay: the second attempt
+ * rewrites the same row instead of failing on the primary key.
  */
 export async function createHabit(habit: NewHabit): Promise<Habit> {
   const insert = toHabitInsert(habit)
@@ -64,7 +69,7 @@ export async function createHabit(habit: NewHabit): Promise<Habit> {
     // `set_row_user_id` supplies user_id from auth.uid() on insert, so the
     // payload correctly omits it. The generated Insert type still requires the
     // column; this is the one narrow cast at the client boundary.
-    .insert(insert as TablesInsert<'habits'>)
+    .upsert(insert as TablesInsert<'habits'>, { onConflict: 'id' })
     .select()
     .single()
 
