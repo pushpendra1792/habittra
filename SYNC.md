@@ -60,8 +60,9 @@ check-in for a habit that was created offline is behind that habit's create,
 because the create was enqueued first. Replay continues past a permanent failure
 so one bad operation does not block everything behind it. Network failures keep
 the operation in place and retry with backoff (1s, 2s, 4s, up to 30s). Auth
-failures pause the queue without dropping anything; it resumes when a valid
-session is available or the user taps Retry.
+failures pause the queue without dropping anything. It stays paused until the
+user taps **Retry** in the header, or signs out and back in; Supabase refreshing
+the token in the background does not restart replay on its own.
 
 Replay is idempotent:
 
