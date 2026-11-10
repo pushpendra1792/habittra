@@ -173,7 +173,9 @@ export class SyncEngine {
 
     if (result.outcome === 'network') {
       this.networkDown = true
-      const delay = retryDelayMs(result.pending[0]?.retryCount ?? 0)
+      // The failed operation was incremented once before the result came back,
+      // so subtract that attempt to make the first wait one second, not two.
+      const delay = retryDelayMs((result.pending[0]?.retryCount ?? 1) - 1)
       this.timer = setTimeout(() => {
         this.timer = null
         void this.run()
