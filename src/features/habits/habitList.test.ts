@@ -11,8 +11,10 @@ import {
   nextHabitColor,
   nextSortOrder,
   orderHabits,
+  patchHabitInList,
   planReorder,
   reorderHabits,
+  upsertHabitInList,
 } from './habitList'
 
 describe('orderHabits', () => {
@@ -53,6 +55,73 @@ describe('orderHabits', () => {
     orderHabits(habits)
 
     expect(habits.map((habit) => habit.id)).toEqual(['b', 'a'])
+  })
+})
+
+describe('upsertHabitInList', () => {
+  it('adds a new habit in sort order', () => {
+    const habits = [makeHabit({ id: 'a', sortOrder: 0 }), makeHabit({ id: 'c', sortOrder: 2 })]
+    const added = makeHabit({ id: 'b', sortOrder: 1 })
+
+    expect(upsertHabitInList(habits, added).map((habit) => habit.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('replaces an existing habit instead of duplicating it', () => {
+    const habits = [makeHabit({ id: 'a', name: 'Old', sortOrder: 0 })]
+
+    const next = upsertHabitInList(habits, makeHabit({ id: 'a', name: 'New', sortOrder: 0 }))
+
+    expect(next).toHaveLength(1)
+    expect(next[0]?.name).toBe('New')
+  })
+
+  it('handles an empty list and does not mutate the input', () => {
+    const habits = [makeHabit({ id: 'a' })]
+
+    upsertHabitInList(habits, makeHabit({ id: 'b' }))
+
+    expect(upsertHabitInList([], makeHabit({ id: 'solo' }))).toHaveLength(1)
+    expect(habits.map((habit) => habit.id)).toEqual(['a'])
+  })
+})
+
+describe('patchHabitInList', () => {
+  it('patches only the matching habit', () => {
+    const habits = [
+      makeHabit({ id: 'a', name: 'Read', sortOrder: 0 }),
+      makeHabit({ id: 'b', name: 'Walk', sortOrder: 1 }),
+    ]
+
+    const next = patchHabitInList(habits, 'b', { name: 'Run' })
+
+    expect(next.map((habit) => habit.name)).toEqual(['Read', 'Run'])
+  })
+
+  it('reorders when the patch changes sortOrder', () => {
+    const habits = [
+      makeHabit({ id: 'a', sortOrder: 0 }),
+      makeHabit({ id: 'b', sortOrder: 1 }),
+      makeHabit({ id: 'c', sortOrder: 2 }),
+    ]
+
+    const next = patchHabitInList(habits, 'a', { sortOrder: 3 })
+
+    expect(next.map((habit) => habit.id)).toEqual(['b', 'c', 'a'])
+    expect(next.find((habit) => habit.id === 'a')?.sortOrder).toBe(3)
+  })
+
+  it('leaves the list alone for an unknown id', () => {
+    const habits = [makeHabit({ id: 'a', sortOrder: 0 })]
+
+    expect(patchHabitInList(habits, 'missing', { name: 'Nope' })).toEqual(habits)
+  })
+
+  it('does not mutate the habits it was given', () => {
+    const habits = [makeHabit({ id: 'a', name: 'Read', sortOrder: 0 })]
+
+    patchHabitInList(habits, 'a', { name: 'Run' })
+
+    expect(habits[0]?.name).toBe('Read')
   })
 })
 

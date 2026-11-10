@@ -56,6 +56,31 @@ export function orderHabits(habits: readonly Habit[]): Habit[] {
 }
 
 /**
+ * The cache after an optimistic create.
+ *
+ * An existing row with the same id is replaced rather than duplicated, which
+ * makes the function safe to use for a retry or a replayed create.
+ */
+export function upsertHabitInList(habits: readonly Habit[], habit: Habit): Habit[] {
+  return orderHabits([...habits.filter((existing) => existing.id !== habit.id), habit])
+}
+
+/**
+ * The cache after an optimistic patch.
+ *
+ * Applying the patch through `orderHabits` matters for a reorder or a restore:
+ * changing `sortOrder` can change the row's position in the same render. A patch
+ * for an id that is no longer in the list changes nothing.
+ */
+export function patchHabitInList(
+  habits: readonly Habit[],
+  id: string,
+  patch: Partial<Omit<Habit, 'id' | 'userId'>>,
+): Habit[] {
+  return orderHabits(habits.map((habit) => (habit.id === id ? { ...habit, ...patch } : habit)))
+}
+
+/**
  * The next colour in the five colour cycle, for a habit being added.
  *
  * Counted over every habit, archived included: an archived habit still owns its
