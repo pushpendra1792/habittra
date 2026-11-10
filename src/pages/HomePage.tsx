@@ -153,7 +153,7 @@ export function HomePage() {
             {tracker}
           </Card>
         ) : (
-          <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(8.5rem,10rem)_minmax(0,1fr)_minmax(10rem,12rem)] md:grid-rows-[auto_auto_auto] md:gap-4">
+          <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(8.5rem,10rem)_minmax(0,1fr)_minmax(10rem,12rem)] md:grid-rows-[auto_auto_auto] md:gap-4 xl:grid-cols-[minmax(10rem,11rem)_minmax(0,1fr)_minmax(10rem,12rem)]">
             {monthStats.hasActiveHabits ? (
               <>
                 <SuccessRateCard

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { checkinsOn, makeHabit } from '@/test/factories'
 import type { DateString, MonthKey } from '@/types'
 import { barHeightPct, dailyPoints, formatOneDecimal, recentCountWindow } from './chartModel'
+import { formatShortDate } from './dateFormat'
 import { mapMonthStats } from './monthStats'
 
 const JULY = '2023-07' as MonthKey
@@ -179,5 +180,22 @@ describe('formatOneDecimal', () => {
     expect(formatOneDecimal(61.94)).toBe('61.9')
     expect(formatOneDecimal(100)).toBe('100.0')
     expect(formatOneDecimal(0)).toBe('0.0')
+  })
+})
+
+describe('formatShortDate', () => {
+  it('uses a short month and drops the leading zero from the day', () => {
+    expect(formatShortDate('2026-10-01')).toBe('Oct 1, 2026')
+    expect(formatShortDate('2026-01-05')).toBe('Jan 5, 2026')
+    expect(formatShortDate('2026-01-01')).toBe('Jan 1, 2026')
+  })
+
+  it('keeps the local calendar day for a month end', () => {
+    expect(formatShortDate('2026-10-31')).toBe('Oct 31, 2026')
+    expect(formatShortDate('2026-12-31')).toBe('Dec 31, 2026')
+  })
+
+  it('leaves an unparseable value untouched', () => {
+    expect(formatShortDate('not-a-date' as DateString)).toBe('not-a-date')
   })
 })

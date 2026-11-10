@@ -1,5 +1,6 @@
 import { Card } from '@/components/ui/Card'
 import { monthName } from '@/features/tracker/monthParam'
+import { formatShortDate } from './dateFormat'
 import type { MonthStats } from './monthStats'
 
 export interface MonthInfoCardProps {
@@ -9,9 +10,9 @@ export interface MonthInfoCardProps {
 
 function InfoRow({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="flex items-baseline justify-between gap-2">
-      <dt className="text-[11px] text-text-muted-on-dark">{label}</dt>
-      <dd className="tabular text-xs font-medium text-text-on-dark">{value}</dd>
+    <div className="flex flex-col gap-0.5 xl:flex-row xl:items-baseline xl:justify-between xl:gap-2">
+      <dt className="whitespace-nowrap text-[11px] text-text-muted-on-dark">{label}</dt>
+      <dd className="tabular whitespace-nowrap text-xs font-medium text-text-on-dark">{value}</dd>
     </div>
   )
 }
@@ -32,8 +33,8 @@ export function MonthInfoCard({ stats, className = '' }: MonthInfoCardProps) {
       <dl className="mt-3 space-y-2">
         <InfoRow label="Year" value={stats.year} />
         <InfoRow label="Month" value={monthName(stats.monthKey)} />
-        <InfoRow label="Start date" value={stats.startDate} />
-        <InfoRow label="End date" value={stats.endDate} />
+        <InfoRow label="Start date" value={formatShortDate(stats.startDate)} />
+        <InfoRow label="End date" value={formatShortDate(stats.endDate)} />
         <InfoRow label="Total days" value={stats.daysInMonth} />
       </dl>
     </Card>
