@@ -69,7 +69,7 @@ export function pendingCount(snapshot: SyncSnapshot): number {
   return snapshot.pending.length
 }
 
-/** Moves failed operations back to the front of the queue for a manual retry. */
+/** Appends failed operations to the queue for a manual retry. */
 export function retryFailed(snapshot: SyncSnapshot): SyncSnapshot {
   return {
     pending: collapseOperations([
@@ -114,10 +114,10 @@ function statusOf(error: unknown): number {
 /**
  * Decides whether to keep, pause or fail an operation.
  *
- * Network and 5xx failures are transient. Auth failures are a pause: the queue
- * must survive until the session is restored. Everything else is a rule the
- * server will keep rejecting, so it belongs in the failed list where the user
- * can see it.
+ * Network failures, timeouts, rate limits and 5xx failures are transient. Auth
+ * failures are a pause: the queue must survive until the session is restored.
+ * Everything else is a rule the server will keep rejecting, so it belongs in the
+ * failed list where the user can see it.
  */
 export function classifySyncError(error: unknown): SyncErrorKind {
   const message = messageOf(error)
@@ -126,6 +126,8 @@ export function classifySyncError(error: unknown): SyncErrorKind {
 
   if (
     status >= 500 ||
+    status === 408 ||
+    status === 429 ||
     message.includes('failed to fetch') ||
     message.includes('networkerror') ||
     message.includes('network request failed') ||

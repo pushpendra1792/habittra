@@ -175,8 +175,10 @@ describe('classifySyncError', () => {
     )
   })
 
-  it('keeps retrying server failures', () => {
+  it('keeps retrying server failures, timeouts and rate limits', () => {
     expect(classifySyncError({ status: 503, message: 'Service unavailable' })).toBe('network')
+    expect(classifySyncError({ status: 408, message: 'Request timeout' })).toBe('network')
+    expect(classifySyncError({ status: 429, message: 'Too many requests' })).toBe('network')
   })
 
   it('pauses on auth failures', () => {
