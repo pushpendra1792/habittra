@@ -16,6 +16,7 @@ import { Navigate, useLocation } from 'react-router-dom'
 
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useAuth } from '@/hooks/useAuth'
+import { useLocalCache } from '@/features/tracker/useLocalCache'
 
 export interface ProtectedRouteProps {
   children?: ReactNode
@@ -36,6 +37,7 @@ function GateSkeleton() {
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { status } = useAuth()
+  const { ready } = useLocalCache()
   const location = useLocation()
 
   if (status === 'loading') {
@@ -44,6 +46,10 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (status !== 'authenticated') {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  }
+
+  if (!ready) {
+    return <GateSkeleton />
   }
 
   return <>{children}</>

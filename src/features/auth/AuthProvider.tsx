@@ -32,6 +32,7 @@ import {
 } from '@/features/auth/redirects'
 import { logAuthError } from '@/lib/api/errors'
 import { getSupabaseClient, SupabaseConfigError } from '@/lib/supabase'
+import { clearLocalData } from '@/lib/sync/localCache'
 
 export interface AuthProviderProps {
   children?: ReactNode
@@ -121,6 +122,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } = supabase.auth.onAuthStateChange((event, next) => {
       if (!active) {
         return
+      }
+
+      if (event === 'SIGNED_OUT') {
+        void clearLocalCache()
       }
 
       setState((current) => ({
@@ -217,6 +222,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (error !== null) {
       throw error
     }
+
+    await clearLocalCache()
   }, [])
 
   const user = sessionUser(state.session)
@@ -268,4 +275,21 @@ function isRecoveryUrlPresent(): boolean {
   }
 
   return isRecoveryUrl(`${window.location.hash}${window.location.search}`)
+}
+
+/**
+ * Removes cached rows and queued writes after the session is gone.
+ *
+ * A storage failure must not turn a successful sign-out into an error screen.
+ * There is nothing sensitive left in IndexedDB that an unauthenticated page can
+ * read, and the next sign-in starts from a clean query cache anyway.
+ */
+async function clearLocalCache(): Promise<void> {
+  try {
+    await clearLocalData()
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      console.error('[offline] could not clear local data', error)
+    }
+  }
 }
