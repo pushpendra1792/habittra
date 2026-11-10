@@ -45,7 +45,7 @@ export function LocalCacheProvider({ children }: LocalCacheProviderProps) {
 
     void (async () => {
       try {
-        await hydrateTrackerCache(queryClient, userId)
+        await hydrateTrackerCache(queryClient, userId, () => lifecycle.active)
       } catch (error) {
         if (import.meta.env.DEV) {
           console.error('[offline] could not read local cache', error)

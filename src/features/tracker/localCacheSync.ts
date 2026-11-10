@@ -20,12 +20,29 @@ import {
 
 const MONTH_KEY = /^\d{4}-(0[1-9]|1[0-2])$/
 
-/** Copies this user's cached habits and months into the query cache. */
-export async function hydrateTrackerCache(queryClient: QueryClient, userId: string): Promise<void> {
+/**
+ * Copies this user's cached habits and months into the query cache.
+ *
+ * `isActive` is checked after the IndexedDB reads and before anything reaches
+ * the cache. A hydration for account A that finishes after account B signed in
+ * must not paint A's rows for B, and React StrictMode makes overlapping effects
+ * normal rather than theoretical.
+ *
+ * Returns false when the read was abandoned.
+ */
+export async function hydrateTrackerCache(
+  queryClient: QueryClient,
+  userId: string,
+  isActive: () => boolean = () => true,
+): Promise<boolean> {
   const [habits, months] = await Promise.all([
     readCachedHabits(userId),
     readAllCachedCheckins(userId),
   ])
+
+  if (!isActive()) {
+    return false
+  }
 
   if (habits !== null) {
     queryClient.setQueryData(habitListKey, habits)
@@ -43,6 +60,8 @@ export async function hydrateTrackerCache(queryClient: QueryClient, userId: stri
   for (const month of months) {
     void queryClient.invalidateQueries({ queryKey: checkinsKey(month.monthKey) })
   }
+
+  return true
 }
 
 /**
