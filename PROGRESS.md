@@ -108,20 +108,20 @@ Retry` in the header. It is status text plus one button; there is no popup.
 | `npm run lint`         | Pass                                                                                                                                                                                                                                                  |
 | `npm run typecheck`    | Pass                                                                                                                                                                                                                                                  |
 | `npm test`             | Pass — 27 files, 512 tests. Five engine tests cover replay, offline enqueue, auth pause/retry, permanent-failure announcement and backoff. Two expected `useToast` stack traces are printed by `Toast.test.tsx`; they are stderr noise, not failures. |
-| `npm run build`        | Pass — warning: main bundle is 692.67 kB, over the 500 kB warning limit.                                                                                                                                                                              |
+| `npm run build`        | Pass — warning: main bundle is 692.68 kB, over the 500 kB warning limit.                                                                                                                                                                              |
 | `npm run format:check` | Pass                                                                                                                                                                                                                                                  |
 | `npm run test:e2e`     | Pass — 51 tests across 360px, 768px and 1280px in 1.0m.                                                                                                                                                                                               |
 
 The dashboard's own chunks are `DailyCompletionChart` at 3.79 kB and a shared
 316.53 kB lazy chunk that holds Recharts and `Tabs`; neither is in the initial
-main chunk. The main chunk grew from 675.95 kB to 692.67 kB for `idb`, the sync
-engine, cache hydration and the header indicator, +16.72 kB (206.65 kB gzip,
-+4.80 kB).
+main chunk. The main chunk grew from 675.95 kB to 692.68 kB for `idb`, the sync
+engine, cache hydration and the header indicator, +16.73 kB (206.66 kB gzip,
++4.81 kB).
 
 ## Known issues
 
 1. Not built yet: Capacitor/Android (Phase 8) and CI (Phase 10).
-2. The main JS chunk is 692.67 kB; the build warns about the 500 kB limit.
+2. The main JS chunk is 692.68 kB; the build warns about the 500 kB limit.
 3. The tracker and dashboard have no signed-in E2E coverage because `/` is
    behind the real Supabase auth gate. Their pure helpers are unit-tested, but
    the responsive layouts are checked by class/width arithmetic rather than a
