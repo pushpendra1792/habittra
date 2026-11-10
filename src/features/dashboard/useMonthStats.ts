@@ -41,8 +41,13 @@ export function useMonthStats(monthKey: MonthKey): UseMonthStatsResult {
     [habits, checkins, monthKey, today],
   )
 
-  const habitsFailed = habitsQuery.isError
-  const checkinsFailed = checkinsQuery.isError
+  // A failed background refresh is not a failed tracker. When IndexedDB has
+  // already supplied the month, the failed request must leave that copy on
+  // screen; only a query with no data at all is allowed to become an error
+  // panel. Otherwise opening the app offline would hide everything it just
+  // hydrated.
+  const habitsFailed = habitsQuery.isError && habitsQuery.data === undefined
+  const checkinsFailed = checkinsQuery.isError && checkinsQuery.data === undefined
   const refetchHabits = habitsQuery.refetch
   const refetchCheckins = checkinsQuery.refetch
 
